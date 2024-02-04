@@ -1,1 +1,1 @@
-# New-Century
+# New Century - MCTS chess engine

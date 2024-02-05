@@ -24,15 +24,19 @@ struct Node {
 
     inline double uct() 
     {
-        assert(parent->visits > 0);
+        assert(parent != nullptr && parent->visits > 0);
         if (visits == 0) return INF;
 
         return (double)value / (double)visits +
                UCT_C * sqrt(ln(parent->visits) / (double)visits);
     }
 
-    inline bool isTerminal() {
-        return moves.size() == 0 || board.isFiftyMovesDraw() || board.isInsufficientMaterial();
+    inline bool isTerminal() 
+    {
+        return moves.size() == 0 
+               || board.isFiftyMovesDraw() 
+               || board.isInsufficientMaterial()
+               || board.isRepetition(parent == nullptr);
     }
 
     inline Node* expand() 
@@ -47,10 +51,12 @@ struct Node {
 
     inline Result simulate()
     {
-        if (moves.size() == 0)
-            return board.inCheck() ? LOSS : DRAW;
-        else if (board.isFiftyMovesDraw() || board.isInsufficientMaterial())
-            return DRAW;
+        assert(parent != nullptr);
+
+        if (isTerminal())
+            return moves.size() == 0 
+                   ? (board.inCheck() ? LOSS : DRAW)
+                   : DRAW;
         
         Board simulationBoard = board;
         Array218<Move> currentMoves = moves;
@@ -60,7 +66,8 @@ struct Node {
             simulationBoard.makeMove(currentMoves[randomIdx]);
 
             if (simulationBoard.isFiftyMovesDraw() 
-            || simulationBoard.isInsufficientMaterial())
+            || simulationBoard.isInsufficientMaterial()
+            || simulationBoard.isRepetition(false))
                 return DRAW;
 
             simulationBoard.getMoves(currentMoves);
@@ -76,6 +83,8 @@ struct Node {
 
     inline void backprop(Result result)
     {
+        assert(parent != nullptr);
+
         Node *current = this;
         while (current != nullptr)
         {

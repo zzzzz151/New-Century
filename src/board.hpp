@@ -107,6 +107,7 @@ struct Board
     u16 currentMoveCounter;
     u64 zobristHash;
     Move lastMove;
+    std::vector<u64> repetitionHashes;
 
     inline Board() = default;
 
@@ -117,6 +118,9 @@ struct Board
             initInBetweenLineThrough();
             boardInitialized = true;
         }
+
+        lastMove = MOVE_NONE;
+        repetitionHashes = {};
 
         trim(fen);
         std::vector<std::string> fenSplit = splitString(fen, ' ');
@@ -179,8 +183,6 @@ struct Board
         // Parse last 2 fen tokens
         pliesSincePawnOrCapture = fenSplit.size() >= 5 ? stoi(fenSplit[4]) : 0;
         currentMoveCounter = fenSplit.size() >= 6 ? stoi(fenSplit[5]) : 1;
-
-        lastMove = MOVE_NONE;
     }
 
     inline std::string fen()
@@ -381,6 +383,17 @@ struct Board
         return numPieces == 3 
                && (getBitboard(PieceType::KNIGHT) > 0 
                || getBitboard(PieceType::BISHOP) > 0);
+    }
+
+    inline bool isRepetition(bool threeFold)
+    {
+        int count = 0;
+
+        for (int i = (int)repetitionHashes.size() - 2; i >= 0; i -= 2)
+            if (zobristHash == repetitionHashes[i] && ++count == (threeFold ? 2 : 1))
+                return true;
+
+        return false;
     }
 
     inline bool isSquareAttacked(Square square, Color colorAttacking)
@@ -723,6 +736,15 @@ struct Board
         bool isCapture = this->isCapture(move);
         Color oppSide = this->oppSide();
 
+        if (pieceType == PieceType::PAWN || isCapture) {
+            pliesSincePawnOrCapture = 0;
+            repetitionHashes = {};
+        }
+        else {
+            pliesSincePawnOrCapture++;
+            repetitionHashes.push_back(zobristHash);
+        }
+
         removePiece(from);
 
         if (moveFlag == Move::CASTLING_FLAG)
@@ -775,17 +797,12 @@ struct Board
             zobristHash ^= ZOBRIST_FILES[(int)squareFile(enPassantSquare)];
         }
 
-        if (pieceType == PieceType::PAWN || isCapture)
-            pliesSincePawnOrCapture = 0;
-        else
-            pliesSincePawnOrCapture++;
-
-        if (colorToMove == Color::BLACK)
-            currentMoveCounter++;
-
         zobristHash ^= ZOBRIST_COLOR[(int)colorToMove];
         colorToMove = oppSide;
         zobristHash ^= ZOBRIST_COLOR[(int)colorToMove];
+
+        if (colorToMove == Color::WHITE)
+            currentMoveCounter++;
 
         lastMove = move;
     }

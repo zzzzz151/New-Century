@@ -49,7 +49,8 @@ inline void uciLoop(Searcher &searcher)
             int depth = stoi(tokens[1]);
             perft::perftBench(searcher.board, depth);
         }
-        else if (tokens[0] == "perftsplit" || tokens[0] == "splitperft" 
+        else if (tokens[0] == "perftsplit" 
+        || tokens[0] == "splitperft" 
         || tokens[0] == "perftdivide")
         {
             int depth = stoi(tokens[1]);
@@ -68,32 +69,7 @@ inline void uciLoop(Searcher &searcher)
                 searcher.board.makeMove(move);
             }
         }
-        else if (received == "incheck")
-            std::cout << searcher.board.inCheck() << std::endl;
-        else if (received == "checkers")
-            printBitboard(searcher.board.checkers());
-        else if (received == "threats")
-            printBitboard(searcher.board.threats());
-        else if (received == "pinned")
-        {
-            auto [pinnedNonDiagonal, pinnedDiagonal] = searcher.board.pinned();
-            std::cout << "Pinned non diagonal" << std::endl;
-            printBitboard(pinnedNonDiagonal);
-            std::cout << "Pinned diagonal" << std::endl;
-            printBitboard(pinnedDiagonal);
-        }
-        else if (tokens[0] == "inbetween")
-        {
-            Square sq1 = stoi(tokens[1]);
-            Square sq2 = stoi(tokens[2]);
-            printBitboard(IN_BETWEEN[sq1][sq2]);
-        }
-        else if (tokens[0] == "linethrough")
-        {
-            Square sq1 = stoi(tokens[1]);
-            Square sq2 = stoi(tokens[2]);
-            printBitboard(LINE_THROUGH[sq1][sq2]);
-        }
+
         } 
         catch (const char* errorMessage)
         {

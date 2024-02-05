@@ -1,8 +1,8 @@
 #include <stdexcept>
+#include "eval.hpp"
 #include "see.hpp"
 
 const double UCT_C = 1.5;
-const Result WIN = 1, LOSS = -1, DRAW = 0;
 
 struct Node {
     public:
@@ -10,7 +10,8 @@ struct Node {
     Array218<Move> moves;
     Node *parent;
     std::vector<Node> children;
-    i32 visits, value;
+    i32 visits;
+    double value;
 
     inline Node(Board &board, Node *parent)
     {
@@ -27,7 +28,7 @@ struct Node {
         assert(parent != nullptr && parent->visits > 0);
         if (visits == 0) return INF;
 
-        return (double)value / (double)visits +
+        return value / (double)visits +
                UCT_C * sqrt(ln(parent->visits) / (double)visits);
     }
 
@@ -49,39 +50,24 @@ struct Node {
         return &children.back();
     }
 
-    inline Result simulate()
+    inline double simulate()
     {
         assert(parent != nullptr);
 
         if (isTerminal())
-            return moves.size() == 0 
-                   ? (board.inCheck() ? LOSS : DRAW)
-                   : DRAW;
-        
-        Board simulationBoard = board;
-        Array218<Move> currentMoves = moves;
+            return moves.size() == 0
+                   ? (board.inCheck() ? -1 : 0)
+                   : 0;
 
-        while (true) {
-            u8 randomIdx = randomU64() % currentMoves.size();
-            simulationBoard.makeMove(currentMoves[randomIdx]);
+        double wdl = 1.0 / (1.0 + exp(-evaluate(board) / 400.0)); // [0, 1]
+        wdl *= 2; // [0, 2]
+        wdl -= 1; // [-1, 1]
 
-            if (simulationBoard.isFiftyMovesDraw() 
-            || simulationBoard.isInsufficientMaterial()
-            || simulationBoard.isRepetition(false))
-                return DRAW;
-
-            simulationBoard.getMoves(currentMoves);
-            if (currentMoves.size() == 0)
-            {
-                return simulationBoard.inCheck() 
-                       ? (simulationBoard.sideToMove() == board.sideToMove()
-                          ? LOSS : WIN)
-                       : DRAW;
-            }
-        }
+        assert(wdl >= -1 && wdl <= 1);
+        return wdl;
     }
 
-    inline void backprop(Result result)
+    inline void backprop(double wdl)
     {
         assert(parent != nullptr);
 
@@ -89,8 +75,8 @@ struct Node {
         while (current != nullptr)
         {
             current->visits++;
-            result *= -1;
-            current->value += result;
+            wdl *= -1;
+            current->value += wdl;
             current = current->parent;
         }
     }
@@ -160,15 +146,15 @@ class Searcher {
 
             if (selected->isTerminal())
             {
-                Result result = selected->moves.size() == 0
-                                ? (selected->board.inCheck() ? LOSS : DRAW)
-                                : DRAW;
-                selected->backprop(result);
+                double wdl = selected->moves.size() == 0
+                             ? (selected->board.inCheck() ? -1 : 0)
+                             : 0;
+                selected->backprop(wdl);
             }
             else {
                 Node *newNode = selected->expand();
-                Result result = newNode->simulate();
-                newNode->backprop(result);
+                double wdl = newNode->simulate();
+                newNode->backprop(wdl);
             }
 
             nodes++;

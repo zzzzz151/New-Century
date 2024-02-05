@@ -86,5 +86,3 @@ const u64 ONES = 0xFFFF'FFFF'FFFF'FFFF;
 const u8 CASTLE_SHORT = 0, CASTLE_LONG = 1;
 
 const i32 INF = 9999999;
-
-using Result = i32;

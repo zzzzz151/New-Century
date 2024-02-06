@@ -11,6 +11,7 @@
 #include "move.hpp"
 #include "array218.hpp"
 #include "attacks.hpp"
+#include "nnue.hpp"
 
 u64 ZOBRIST_COLOR[2],         // [color]
     ZOBRIST_PIECES[2][6][64], // [color][pieceType][square]
@@ -108,6 +109,7 @@ struct Board
     u64 zobristHash;
     Move lastMove;
     std::vector<u64> repetitionHashes;
+    Accumulator accumulator;
 
     inline Board() = default;
 
@@ -121,6 +123,7 @@ struct Board
 
         lastMove = MOVE_NONE;
         repetitionHashes = {};
+        accumulator = Accumulator();
 
         trim(fen);
         std::vector<std::string> fenSplit = splitString(fen, ' ');
@@ -245,6 +248,7 @@ struct Board
         colorBitboard[(int)color] |= sqBitboard;
         piecesBitboards[(int)pieceType] |= sqBitboard;
         zobristHash ^= ZOBRIST_PIECES[(int)color][(int)pieceType][square];
+        accumulator.activate(color, pieceType, square);
     }
 
     inline void removePiece(Square square) {
@@ -256,6 +260,7 @@ struct Board
             colorBitboard[(int)color] ^= sqBitboard;
             piecesBitboards[(int)pt] ^= sqBitboard;
             zobristHash ^= ZOBRIST_PIECES[(int)color][(int)pt][square];
+            accumulator.deactivate(color, pt, square);
         }
     }
 

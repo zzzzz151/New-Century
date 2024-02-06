@@ -1,5 +1,5 @@
 #include <stdexcept>
-#include "eval.hpp"
+#include "nnue.hpp"
 #include "see.hpp"
 
 const double UCT_C = 1.5;
@@ -59,10 +59,10 @@ struct Node {
                    ? (board.inCheck() ? -1 : 0)
                    : 0;
 
-        double wdl = 1.0 / (1.0 + exp(-evaluate(board) / 400.0)); // [0, 1]
+        i32 eval = nnue::evaluate(board.accumulator, board.sideToMove());
+        double wdl = 1.0 / (1.0 + exp(-eval / 200.0)); // [0, 1]
         wdl *= 2; // [0, 2]
         wdl -= 1; // [-1, 1]
-
         assert(wdl >= -1 && wdl <= 1);
         return wdl;
     }

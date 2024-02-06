@@ -69,6 +69,11 @@ inline void uciLoop(Searcher &searcher)
                 searcher.board.makeMove(move);
             }
         }
+        else if (received == "eval") {
+            Color stm = searcher.board.sideToMove();
+            Accumulator &acc = searcher.board.accumulator;
+            std::cout << nnue::evaluate(acc, stm) << std::endl;
+        }
 
         } 
         catch (const char* errorMessage)

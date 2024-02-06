@@ -10,17 +10,18 @@ struct Node {
     Array218<Move> moves;
     Node *parent;
     std::vector<Node> children;
-    i32 visits;
+    u32 visits;
     double value;
+    u16 depth;
 
-    inline Node(Board &board, Node *parent)
-    {
+    inline Node(Board &board, Node *parent, u16 depth) {
         this->board = board;
         this->board.getMoves(moves);
         moves.shuffle();
         this->parent = parent;
         children = {};
         visits = value = 0;
+        this->depth = depth;
     }
 
     inline double uct() 
@@ -32,26 +33,25 @@ struct Node {
                UCT_C * sqrt(ln(parent->visits) / (double)visits);
     }
 
-    inline bool isTerminal() 
-    {
+    inline bool isTerminal() {
         return moves.size() == 0 
                || board.isFiftyMovesDraw() 
                || board.isInsufficientMaterial()
                || board.isRepetition(parent == nullptr);
     }
 
-    inline Node* expand() 
-    {
+    inline Node* expand() {
         assert(children.size() < moves.size());
+
         Move move = moves[children.size()];
         Board childBoard = board;
         childBoard.makeMove(move);
-        children.push_back(Node(childBoard, this));
+        children.push_back(Node(childBoard, this, depth + 1));
+
         return &children.back();
     }
 
-    inline double simulate()
-    {
+    inline double simulate() {
         assert(parent != nullptr);
 
         if (isTerminal())
@@ -59,21 +59,20 @@ struct Node {
                    ? (board.inCheck() ? -1 : 0)
                    : 0;
 
-        i32 eval = nnue::evaluate(board.accumulator, board.sideToMove());
+        double eval = nnue::evaluate(board.accumulator, board.sideToMove());
         double wdl = 1.0 / (1.0 + exp(-eval / 200.0)); // [0, 1]
         wdl *= 2; // [0, 2]
         wdl -= 1; // [-1, 1]
+
         assert(wdl >= -1 && wdl <= 1);
         return wdl;
     }
 
-    inline void backprop(double wdl)
-    {
+    inline void backprop(double wdl) {
         assert(parent != nullptr);
 
         Node *current = this;
-        while (current != nullptr)
-        {
+        while (current != nullptr) {
             current->visits++;
             wdl *= -1;
             current->value += wdl;
@@ -81,9 +80,8 @@ struct Node {
         }
     }
 
-    inline Node* mostVisitsChild()
-    {
-        assert(children.size() > 0);
+    inline Node* mostVisitsChild() {
+        assert(moves.size() > 0 && children.size() > 0);
         Node *highestVisitsChild = &children[0];
 
         for (Node &child : children)
@@ -100,20 +98,18 @@ class Searcher {
 
     Board board;
     std::chrono::time_point<std::chrono::steady_clock> startTime;
-    u64 milliseconds, nodes, maxNodes;
+    u64 milliseconds, nodes, maxNodes, iterations;
 
     const i64 OVERHEAD_MILLISECONDS = 10;
 
-    inline Searcher(Board board)
-    {
+    inline Searcher(Board board) {
         resetLimits();
         this->board = board;
     }
 
-    inline void resetLimits()
-    {
+    inline void resetLimits() {
         startTime = std::chrono::steady_clock::now();
-        nodes = 0;
+        nodes = iterations = 0;
         milliseconds = maxNodes = U64_MAX;
     }
 
@@ -125,20 +121,18 @@ class Searcher {
             this->milliseconds = max(milliseconds / movesToGo - OVERHEAD_MILLISECONDS, (i64)1);
     }
 
-    inline bool stop()
-    {
+    inline bool stop() {
         if (nodes >= maxNodes) return true;
 
-        if ((nodes % 128) != 0) return false;
+        if ((iterations % 512) != 0) return false;
 
         return millisecondsElapsed(startTime) >= milliseconds;
     }
 
-    inline Move search()
-    {
+    inline Move search() {
         resetRng();
-        nodes = 0;
-        Node root = Node(board, nullptr);
+        nodes = iterations = 0;
+        Node root = Node(board, nullptr, 0);
         assert(!root.isTerminal());
 
         while (!stop()) {
@@ -153,12 +147,13 @@ class Searcher {
             }
             else {
                 Node *newNode = selected->expand();
+                nodes++;
                 double wdl = newNode->simulate();
                 newNode->backprop(wdl);
             }
 
-            nodes++;
-            if ((nodes % 32768) == 0) 
+            iterations++;
+            if ((iterations % (1ULL << 18)) == 0) 
                 printInfo(root.mostVisitsChild());
         }
 
@@ -167,8 +162,7 @@ class Searcher {
         return bestRootChild->board.getLastMove();
     }
 
-    inline Node* select(Node *root)
-    {
+    inline Node* select(Node *root) {
         Node* current = root;
         while (true)
         {
@@ -200,12 +194,15 @@ class Searcher {
     {
         u64 msElapsed = millisecondsElapsed(startTime);
         u64 nps = nodes * 1000 / max(msElapsed, 1ULL);
-        i32 score = round((double)bestRootChild->value / (double)bestRootChild->visits);
+        u64 ips = iterations * 1000 / max(msElapsed, 1ULL);
+        double wdl = bestRootChild->value / (double)bestRootChild->visits;
 
-        std::cout << "info nodes " << nodes 
-                  << " time " << msElapsed
+        std::cout << "info time " << msElapsed
+                  << " nodes " << nodes
                   << " nps " << nps
-                  << " score " << score
+                  << " iterations " << iterations
+                  << " ips " << ips
+                  << " wdl " << round(wdl * 100.0)
                   << " pv " << bestRootChild->board.getLastMove().toUci()
                   << std::endl;
     }

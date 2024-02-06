@@ -5,11 +5,6 @@
 #include "perft.hpp"
 #include "uci.hpp"
 
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <sstream>
-
 int main()
 {
     std::cout << "New Century by zzzzz" << std::endl;

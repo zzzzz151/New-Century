@@ -43,37 +43,55 @@ inline void uciLoop(Searcher &searcher)
             go(searcher, tokens);
         else if (tokens[0] == "print" || tokens[0] == "d"
         || tokens[0] == "display" || tokens[0] == "show")
-            searcher.board.print();
+            searcher.root.board.print();
         else if (tokens[0] == "perft")
         {
             int depth = stoi(tokens[1]);
-            perft::perftBench(searcher.board, depth);
+            perft::perftBench(searcher.root.board, depth);
         }
         else if (tokens[0] == "perftsplit" 
         || tokens[0] == "splitperft" 
         || tokens[0] == "perftdivide")
         {
             int depth = stoi(tokens[1]);
-            perft::perftSplit(searcher.board, depth);
+            perft::perftSplit(searcher.root.board, depth);
         }
         else if (tokens[0] == "makemove")
         {
             if (tokens[1] == "0000" || tokens[1] == "null" || tokens[1] == "none")
             {
-                assert(!searcher.board.inCheck());
-                searcher.board.makeMove(MOVE_NONE);
+                assert(!searcher.root.board.inCheck());
+                searcher.root.board.makeMove(MOVE_NONE);
             }
             else
             {
-                Move move = searcher.board.uciToMove(tokens[1]);
-                searcher.board.makeMove(move);
+                Move move = searcher.root.board.uciToMove(tokens[1]);
+                searcher.root.board.makeMove(move);
             }
         }
         else if (received == "eval") {
-            Color stm = searcher.board.sideToMove();
-            Accumulator &acc = searcher.board.accumulator;
+            Color stm = searcher.root.board.sideToMove();
+            Accumulator &acc = searcher.root.board.accumulator;
             std::cout << nnue::evaluate(acc, stm) << std::endl;
         }
+        else if (received == "policy") {
+            Node root = Node(searcher.root.board, nullptr, 0);
+
+            for (int i = 0; i < root.moves.size(); i++)
+                for (int j = i+1; j < root.moves.size(); j++)
+                    if (root.policy[j] > root.policy[i]) 
+                    {
+                        std::swap(root.policy[i], root.policy[j]);
+                        root.moves.swap(i, j);
+                    }
+
+            for (int i = 0; i < root.moves.size(); i++)
+                std::cout << root.moves[i].toUci() 
+                          << " " << roundToDecimalPlaces(root.policy[i] * 100.0, 2)
+                          << std::endl;
+        }
+        else if (received == "tree")
+            searcher.root.printTree();
 
         } 
         catch (const char* errorMessage)
@@ -115,7 +133,7 @@ inline void position(Searcher &searcher, std::vector<std::string> &tokens)
 
     if (tokens[1] == "startpos")
     {
-        searcher.board = START_BOARD;
+        searcher.root.board = START_BOARD;
         movesTokenIndex = 2;
     }
     else if (tokens[1] == "fen")
@@ -125,14 +143,14 @@ inline void position(Searcher &searcher, std::vector<std::string> &tokens)
         for (i = 2; i < tokens.size() && tokens[i] != "moves"; i++)
             fen += tokens[i] + " ";
         fen.pop_back(); // remove last whitespace
-        searcher.board = Board(fen);
+        searcher.root.board = Board(fen);
         movesTokenIndex = i;
     }
 
     for (int i = movesTokenIndex + 1; i < tokens.size(); i++)
     {
-        Move move = searcher.board.uciToMove(tokens[i]);
-        searcher.board.makeMove(move);
+        Move move = searcher.root.board.uciToMove(tokens[i]);
+        searcher.root.board.makeMove(move);
     }
 }
 
@@ -147,12 +165,12 @@ inline void go(Searcher &searcher, std::vector<std::string> &tokens)
     {
         i64 value = stoi(tokens[i + 1]);
 
-        if ((tokens[i] == "wtime" && searcher.board.sideToMove() == Color::WHITE) 
-        ||  (tokens[i] == "btime" && searcher.board.sideToMove() == Color::BLACK))
+        if ((tokens[i] == "wtime" && searcher.root.board.sideToMove() == Color::WHITE) 
+        ||  (tokens[i] == "btime" && searcher.root.board.sideToMove() == Color::BLACK))
             milliseconds = value;
 
-        else if ((tokens[i] == "winc" && searcher.board.sideToMove() == Color::WHITE) 
-        ||       (tokens[i] == "binc" && searcher.board.sideToMove() == Color::BLACK))
+        else if ((tokens[i] == "winc" && searcher.root.board.sideToMove() == Color::WHITE) 
+        ||       (tokens[i] == "binc" && searcher.root.board.sideToMove() == Color::BLACK))
             incrementMilliseconds = value;
 
         else if (tokens[i] == "movestogo")

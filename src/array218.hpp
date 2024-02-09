@@ -47,4 +47,10 @@ struct Array218
             swap(i, randomIndex);
         }
     }
+
+    inline void print() {
+        for (int i = 0; i < numElements; i++)
+            std::cout << elements[i] << " ";
+        std::endl;
+    }
 };

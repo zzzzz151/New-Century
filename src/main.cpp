@@ -1,7 +1,7 @@
 // clang-format off
 
 #include "board.hpp"
-#include "search.hpp"
+#include "searcher.hpp"
 #include "perft.hpp"
 #include "uci.hpp"
 

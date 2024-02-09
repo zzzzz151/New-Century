@@ -302,3 +302,21 @@ u64 randomU64() {
 
     return rngZ;
 }
+
+template <u16 Size>
+inline void softmax(std::array<double, Size> &arr, u16 actualSize) {
+    double total = 0;
+
+    for (u16 i = 0; i < actualSize; i++) {
+        arr[i] = exp(arr[i]);
+        total += arr[i];
+    }
+
+    for (u16 i = 0; i < actualSize; i++)
+        arr[i] /= total;
+}
+
+inline double roundToDecimalPlaces(double number, int decimalPlaces) {
+    double factor = std::pow(10, decimalPlaces);
+    return std::round(number * factor) / factor;
+}

@@ -9,6 +9,8 @@
 #include <cassert>
 #include <chrono>
 #include <unordered_map>
+#include <cmath>
+#include <iomanip>
 #include "types.hpp"
 
 #if defined(__GNUC__) // GCC, Clang, ICC
@@ -66,9 +68,9 @@ inline Color oppColor(Color color)
     return color == Color::WHITE ? Color::BLACK : Color::WHITE;
 }
 
-inline Rank squareRank(Square square) { return (Rank)(square / 8); }
+constexpr Rank squareRank(Square square) { return (Rank)(square / 8); }
 
-inline File squareFile(Square square) { return (File)(square % 8); }
+constexpr File squareFile(Square square) { return (File)(square % 8); }
 
 const std::string SQUARE_TO_STR[64] = {
     "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
@@ -140,11 +142,9 @@ inline PieceType pieceToPieceType(Piece piece)
 
 inline Color pieceColor(Piece piece)
 {
-    if ((u8)piece <= 5) return Color::WHITE;
-
-    if ((u8)piece <= 11) return Color::BLACK;
-
-    return Color::NONE;
+    return (u8)piece <= 5 ? Color::WHITE
+           : (u8)piece <= 11 ? Color::BLACK
+           : Color::NONE;
 }
 
 inline Piece makePiece(PieceType pieceType, Color color)
@@ -281,42 +281,117 @@ std::string getRandomString(int length) {
     return randomString;
 }
 
-u64 rngX = 123456789, rngY = 362436069, rngZ = 521288629;
+u64 IN_BETWEEN[64][64], LINE_THROUGH[64][64]; // [square][square]
 
-inline void resetRng()
+constexpr void initInBetweenLineThrough()
 {
-    rngX = 123456789;
-    rngY = 362436069;
-    rngZ = 521288629;
+    constexpr int DIRECTIONS[8][2] = {{0,1}, {1,0}, {-1,0}, {0, -1}, 
+                                      {1,1}, {1, -1}, {-1, 1}, {-1,-1}};
+
+    for (int sq1 = 0; sq1 < 64; sq1++)
+        for (int sq2 = 0; sq2 < 64; sq2++)
+        {
+            int rank = (int)squareRank(sq1);
+            int file = (int)squareFile(sq1);
+            bool found = false;
+            LINE_THROUGH[sq1][sq2] = (1ULL << sq1) | (1ULL << sq2);
+            
+            for (auto [x, y] : DIRECTIONS) {
+                u64 between = 0;
+                int r = rank, f = file;
+
+                while (true) {
+                    r += x;
+                    f += y;
+
+                    if (r < 0 || r > 7 || f < 0 || f > 7)
+                        break;
+
+                    Square newSq = r * 8 + f;
+                    if (found) {
+                        LINE_THROUGH[sq1][sq2] |= 1ULL << newSq;
+                        continue;
+                    }
+
+                    if (newSq == sq2) {
+                        found = true;
+                        IN_BETWEEN[sq1][sq2] = between;
+                        LINE_THROUGH[sq1][sq2] |= between;
+                    }
+
+                    between |= 1ULL << newSq;
+                }
+
+                if (found) {
+                    while (true) {
+                        rank += x * -1;
+                        file += y * -1;
+                        if (rank < 0 || rank > 7 || file < 0 || file > 7)
+                            break;
+                        int sq = rank * 8 + file;
+                        LINE_THROUGH[sq1][sq2] |= 1ULL << sq;
+                    }
+                    break;
+                }
+            }
+        }
 }
 
-u64 randomU64() { 
-    rngX ^= rngX << 16;
-    rngX ^= rngX >> 5;
-    rngX ^= rngX << 1;
+class MyRng {
+    public:
 
-    u64 t = rngX;
-    rngX = rngY;
-    rngY = rngZ;
-    rngZ = t ^ rngX ^ rngY;
+    u64 rngX = 123456789, rngY = 362436069, rngZ = 521288629;
 
-    return rngZ;
-}
+    static constexpr u64 min() { return 0; }
 
-template <u16 Size>
-inline void softmax(std::array<double, Size> &arr, u16 actualSize) {
-    double total = 0;
-
-    for (u16 i = 0; i < actualSize; i++) {
-        arr[i] = exp(arr[i]);
-        total += arr[i];
+    static constexpr u64 max() { return std::numeric_limits<u64>::max(); }
+    
+    inline void reset() {
+        rngX = 123456789;
+        rngY = 362436069;
+        rngZ = 521288629;
     }
 
-    for (u16 i = 0; i < actualSize; i++)
-        arr[i] /= total;
+    inline u64 operator()() {
+        rngX ^= rngX << 16;
+        rngX ^= rngX >> 5;
+        rngX ^= rngX << 1;
+
+        u64 t = rngX;
+        rngX = rngY;
+        rngY = rngZ;
+        rngZ = t ^ rngX ^ rngY;
+
+        return rngZ;
+    }
+};
+
+MyRng myRng = MyRng();
+
+inline void softmax(std::vector<float> &vec) {
+    float total = 0;
+
+    for (int i = 0; i < vec.size(); i++) {
+        vec[i] = exp(vec[i]);
+        total += vec[i];
+    }
+
+    for (int i = 0; i < vec.size(); i++)
+        vec[i] /= total;
 }
 
-inline double roundToDecimalPlaces(double number, int decimalPlaces) {
+inline std::string roundToDecimalPlaces(double number, int decimalPlaces) {
     double factor = std::pow(10, decimalPlaces);
-    return std::round(number * factor) / factor;
+    double roundedNumber = std::round(number * factor) / factor;
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(decimalPlaces) << roundedNumber;
+    return oss.str();
+}
+
+inline std::string gameStateToString(GameState gameState)
+{
+    return gameState == GameState::WON ? "GameState::WON"
+           : gameState == GameState::LOST ? "GameState::LOST"
+           : gameState == GameState::DRAW ? "GameState::DRAW"
+           : "GameState::ONGOING";
 }

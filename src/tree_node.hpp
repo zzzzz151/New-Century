@@ -1,106 +1,107 @@
 #include "nnue.hpp"
-#include "see.hpp"
 
-const double CPuct = 1.5;
-
-const double QUIET_MOVE_SCORE = 100,
-             GOOD_NOISY_SCORE = 300,
-             GOOD_QUEEN_PROMO_SCORE = 500,
-             BAD_NOISY_SCORE = -100;
+const double UCT_C = 1.75; // Higher => more exploration
 
 struct Node {
     public:
-    Board board;
-    Node *parent;
-    std::vector<Node> children;
-    Array218<Move> moves;
-    std::array<double, 218> policy;
-    u32 visits;
-    double value;
-    u16 depth;
+    Node *mParent;
+    GameState mGameState;
+    std::vector<Node> mChildren;
+    std::vector<Move> mMoves;
+    //std::vector<float> mPolicy;
+    u32 mVisits;
+    double mResultsSum;
+    u16 mDepth;
 
     inline Node() = default;
 
     inline Node(Board &board, Node *parent, u16 depth) {
-        this->board = board;
-        this->parent = parent;
-        this->children = {};
-        this->board.getMoves(moves, false);
-        this->visits = this->value = 0;
-        this->depth = depth;
+        mParent = parent;
+        mChildren = {};
+        board.getMoves(mMoves);
+        std::shuffle(mMoves.begin(), mMoves.end(), myRng);
+        //mPolicy.resize(mMoves.size());
+        mVisits = mResultsSum = 0;
+        mDepth = depth;
+
+        mGameState = mMoves.size() == 0 
+                     ? (board.inCheck() ? GameState::LOST : GameState::DRAW)
+                     : board.isFiftyMovesDraw() 
+                       || board.isInsufficientMaterial() 
+                       || board.isRepetition(parent == nullptr) 
+                     ? GameState::DRAW
+                     : GameState::ONGOING;
+
+        if (parent == nullptr) 
+            assert(mGameState == GameState::ONGOING);
+    }
+
+    // Q = avg result
+    inline double Q() {
+        assert(mVisits > 0);
+        return (double)mResultsSum / (double)mVisits;
+    }
+
+    inline double uct() {
+        assert(mParent  != nullptr);
+        assert(mVisits > 0);
+        return Q() + UCT_C * sqrt(ln(mParent->mVisits) / mVisits);
+    }
+
+    /*
+    inline double puct(int moveIdx) {
+        assert(mMoves.size() == mPolicy.size());
+        assert(mPolicy.size() > 0 && moveIdx < mPolicy.size());
+        assert(mChildren.size() > 0 && moveIdx < mChildren.size());
         
-        for (int i = 0; i < moves.size(); i++) {
-            Move move = moves[i];
-            PieceType captured = board.captured(move);
-            PieceType promotion = move.promotion();
+        Node *child = &mChildren[moveIdx];
+        assert(child->mVisits > 0);
 
-            if (captured != PieceType::NONE) {
-                policy[i] = SEE(board, move)
-                                ? (promotion == PieceType::QUEEN
-                                   ? GOOD_QUEEN_PROMO_SCORE 
-                                   : GOOD_NOISY_SCORE)
-                                : BAD_NOISY_SCORE;
+        double U = CPuct * mPolicy[moveIdx] * (double)mVisits;
+        U /= 1.0 + (double)child->mVisits;
+        return child->Q() + U;
+    }
+    */
 
-                policy[i] += 10 * (u16)captured - (u16)move.pieceType();
-                continue;
+    inline Node* select(Board &board) 
+    {
+        if (mGameState != GameState::ONGOING
+        || mChildren.size() == 0
+        || mChildren.size() != mMoves.size())
+            return this;
+
+        assert(mMoves.size() > 0);
+        double bestUct = -INF;
+        int bestChildIdx = 0;
+
+        for (int i = 0; i < mChildren.size(); i++) {
+            double childUct = mChildren[i].uct();
+            if (childUct > bestUct) {
+                bestUct = childUct;
+                bestChildIdx = i;
             }
-            else if (promotion != PieceType::NONE)
-                policy[i] = SEE(board, move) ? GOOD_QUEEN_PROMO_SCORE
-                                             : BAD_NOISY_SCORE;
-            else
-                policy[i] = QUIET_MOVE_SCORE;
-
-            policy[i] += randomU64() % 10;
         }
 
-        softmax<218>(policy, moves.size());
+        board.makeMove(mMoves[bestChildIdx]);
+        return mChildren[bestChildIdx].select(board);
     }
 
-    inline double puct(int moveIdx) {
-        assert(moveIdx < children.size());
-        assert(children[moveIdx].visits > 0);
-        assert(children[moveIdx].board.getLastMove() == moves[moveIdx]);
+    inline Node* expand(Board &board) {
+        assert(mMoves.size() > 0);
+        assert(mChildren.size() < mMoves.size());
 
-        double U = CPuct * policy[moveIdx] * (double)visits;
-        U /= 1.0 + (double)children[moveIdx].visits;
+        Move move = mMoves[mChildren.size()];
+        board.makeMove(move);
+        mChildren.push_back(Node(board, this, mDepth + 1));
 
-        return children[moveIdx].value + U;
+        return &mChildren.back();
     }
 
-    inline bool isTerminal() {
-        return moves.size() == 0 
-               || board.isFiftyMovesDraw() 
-               || board.isInsufficientMaterial()
-               || board.isRepetition(parent == nullptr);
-    }
+    inline double simulate(Board &board) {
+        if (mGameState != GameState::ONGOING)
+            return (double)mGameState;
 
-    inline Node* expand() {
-        assert(children.size() < moves.size());
-
-        for (int i = children.size() + 1; i < moves.size(); i++)
-            if (policy[i] > policy[children.size()]) 
-            {
-                std::swap(policy[i], policy[children.size()]);
-                moves.swap(i, children.size());
-            }
-
-        Move move = moves[children.size()];
-        Board childBoard = board;
-        childBoard.makeMove(move);
-        children.push_back(Node(childBoard, this, depth + 1));
-
-        return &children.back();
-    }
-
-    inline double simulate() {
-        assert(parent != nullptr);
-
-        if (isTerminal())
-            return moves.size() == 0
-                   ? (board.inCheck() ? -1 : 0)
-                   : 0;
-
-        double eval = nnue::evaluate(board.accumulator, board.sideToMove());
+        double eval = nnue::evaluate(board.accumulator(), board.sideToMove());
         double wdl = 1.0 / (1.0 + exp(-eval / 200.0)); // [0, 1]
         wdl *= 2; // [0, 2]
         wdl -= 1; // [-1, 1]
@@ -110,47 +111,56 @@ struct Node {
     }
 
     inline void backprop(double wdl) {
-        assert(parent != nullptr);
+        assert(mParent != nullptr);
+        assert(wdl >= -1 && wdl <= 1);
 
         Node *current = this;
         while (current != nullptr) {
-            current->visits++;
+            current->mVisits++;
             wdl *= -1;
-            current->value += wdl;
-            current = current->parent;
+            current->mResultsSum += wdl;
+            current = current->mParent;
         }
     }
 
-    inline Node* mostVisitsChild() {
-        assert(moves.size() > 0 && children.size() > 0);
-        Node *highestVisitsChild = &children[0];
+    inline std::pair<Node*, Move> mostVisits() {
+        assert(mMoves.size() > 0 && mChildren.size() > 0);
 
-        for (Node &child : children)
-            if (child.visits > highestVisitsChild->visits)
-                highestVisitsChild = &child;
+        u32 mostVisits = mChildren[0].mVisits;
+        int mostVisitsIdx = 0;
 
-        return highestVisitsChild;
+        for (int i = 1; i < mChildren.size(); i++)
+            if (mChildren[i].mVisits > mostVisits)
+            {
+                mostVisits = mChildren[i].mVisits;
+                mostVisitsIdx = i;
+            }
+
+        return { &mChildren[mostVisitsIdx], mMoves[mostVisitsIdx] };
     }
 
-    inline std::string nodeToString() 
+    inline std::string toString(Move move) 
     {
-        return "(Node, last move " + board.getLastMove().toUci()
-               + ", depth " + std::to_string(depth)
-               + ", isTerminal " + std::to_string(isTerminal())
-               + ", moves " + std::to_string(moves.size())
-               + ", children " + std::to_string(children.size())
-               + ", visits " + std::to_string(visits)
-               + ", value "+ std::to_string(roundToDecimalPlaces(value, 4))
+        assert(mVisits > 0);
+
+        return "(Node, move " + move.toUci()
+               + ", depth " + std::to_string(mDepth)
+               + ", " + gameStateToString(mGameState)
+               + ", moves " + std::to_string(mMoves.size())
+               + ", children " + std::to_string(mChildren.size())
+               + ", visits " + std::to_string(mVisits)
+               + ", Q (avg result) " + roundToDecimalPlaces(Q(), 4)
+               + ", UCT " + roundToDecimalPlaces(uct(), 4)
                + ")";
     }
 
-    inline void printTree() {
-        for (int i = 0; i < depth; i++)
+    inline void printTree(Move move = MOVE_NONE) {
+        for (int i = 0; i < mDepth; i++)
             std::cout << "  ";
 
-        std::cout << nodeToString() << std::endl;
+        std::cout << toString(move) << std::endl;
             
-        for (Node &child : children)
-            child.printTree();
+        for (int i = 0; i < mChildren.size(); i++)
+            mChildren[i].printTree(mMoves[i]);
     }
 };

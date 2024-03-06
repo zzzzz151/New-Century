@@ -12,7 +12,7 @@ namespace internal {
 
     u64 pawnAttacks[2][64], knightAttacks[64], kingAttacks[64];
 
-    inline u64 pawnAttacksSlow(Square square, Color color)
+    constexpr u64 pawnAttacksSlow(Square square, Color color)
     {
         const int SQUARE_DIAGONAL_LEFT  = square + (color == Color::WHITE ? 7 : -9),
                   SQUARE_DIAGONAL_RIGHT = square + (color == Color::WHITE ? 9 : -7);
@@ -32,7 +32,7 @@ namespace internal {
         return (1ULL << SQUARE_DIAGONAL_LEFT) | (1ULL << SQUARE_DIAGONAL_RIGHT);
     }
 
-    inline u64 bishopAttacksSlow(Square sq, u64 occupied, bool excludeLastSquareEachDirection = false)
+    constexpr u64 bishopAttacksSlow(Square sq, u64 occupied, bool excludeEdges = false)
     {
         u64 attacks = 0ULL;
         int r, f;
@@ -41,7 +41,7 @@ namespace internal {
 
         for (r = br + 1, f = bf + 1; r >= 0 && r <= 7 && f >= 0 && f <= 7; r++, f++)
         {
-            if (excludeLastSquareEachDirection && (f == 7 || r == 7))
+            if (excludeEdges && (f == 7 || r == 7))
                 break;
             Square s = r * 8 + f;
             attacks |= (1ULL << s);
@@ -51,7 +51,7 @@ namespace internal {
 
         for (r = br - 1, f = bf + 1; r >= 0 && r <= 7 && f >= 0 && f <= 7; r--, f++)
         {
-            if (excludeLastSquareEachDirection && (r == 0 || f == 7))
+            if (excludeEdges && (r == 0 || f == 7))
                 break;
             Square s = r * 8 + f;
             attacks |= (1ULL << s);
@@ -61,7 +61,7 @@ namespace internal {
 
         for (r = br + 1, f = bf - 1; r >= 0 && r <= 7 && f >= 0 && f <= 7; r++, f--)
         {
-            if (excludeLastSquareEachDirection && (r == 7 || f == 0))
+            if (excludeEdges && (r == 7 || f == 0))
                 break;
             Square s = r * 8 + f;
             attacks |= (1ULL << s);
@@ -71,7 +71,7 @@ namespace internal {
 
         for (r = br - 1, f = bf - 1; r >= 0 && r <= 7 && f >= 0 && f <= 7; r--, f--)
         {
-            if (excludeLastSquareEachDirection && (r == 0 || f == 0))
+            if (excludeEdges && (r == 0 || f == 0))
                 break;
             Square s = r * 8 + f;
             attacks |= (1ULL << s);
@@ -82,7 +82,7 @@ namespace internal {
         return attacks;
     }
 
-    inline u64 rookAttacksSlow(Square sq, u64 occupied, bool excludeLastSquareEachDirection = false)
+    constexpr u64 rookAttacksSlow(Square sq, u64 occupied, bool excludeEdges = false)
     {
         u64 attacks = 0ULL;
         int r, f;
@@ -91,7 +91,7 @@ namespace internal {
 
         for (r = rr + 1; r >= 0 && r <= 7; r++)
         {
-            if (excludeLastSquareEachDirection && r == 7)
+            if (excludeEdges && r == 7)
                 break;
             Square s = r * 8 + rf;
             attacks |= (1ULL << s);
@@ -101,7 +101,7 @@ namespace internal {
 
         for (r = rr - 1; r >= 0 && r <= 7; r--)
         {
-            if (excludeLastSquareEachDirection && r == 0)
+            if (excludeEdges && r == 0)
                 break;
             Square s = r * 8 + rf;
             attacks |= (1ULL << s);
@@ -111,7 +111,7 @@ namespace internal {
 
         for (f = rf + 1; f >= 0 && f <= 7; f++)
         {
-            if (excludeLastSquareEachDirection && f == 7)
+            if (excludeEdges && f == 7)
                 break;
             Square s = rr * 8 + f;
             attacks |= (1ULL << s);
@@ -121,7 +121,7 @@ namespace internal {
 
         for (f = rf - 1; f >= 0 && f <= 7; f--)
         {
-            if (excludeLastSquareEachDirection && f == 0)
+            if (excludeEdges && f == 0)
                 break;
             Square s = rr * 8 + f;
             attacks |= (1ULL << s);
@@ -199,7 +199,7 @@ namespace internal {
 
 }
 
-inline void init()
+constexpr void init()
 {
     using namespace internal;
 

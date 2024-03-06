@@ -8,6 +8,9 @@
 src-test
 src-test/
 
+trainer
+trainer/
+
 games.txt
 games.pgn
 debug.txt

@@ -30,8 +30,7 @@ const Net *NET = reinterpret_cast<const Net*>(gNetFileData);
 
 struct alignas(ALIGNMENT) Accumulator
 {
-    i16 white[HIDDEN_LAYER_SIZE];
-    i16 black[HIDDEN_LAYER_SIZE];
+    std::array<i16, HIDDEN_LAYER_SIZE> white, black;
 
     inline Accumulator()
     {
@@ -75,12 +74,12 @@ inline i32 evaluate(Accumulator &accumulator, Color color)
 {
     Vec *stmAccumulator, *oppAccumulator;
     if (color == Color::WHITE) {
-        stmAccumulator = (Vec*)accumulator.white;
-        oppAccumulator = (Vec*)accumulator.black;
+        stmAccumulator = (Vec*)&accumulator.white;
+        oppAccumulator = (Vec*)&accumulator.black;
     }
     else {
-        stmAccumulator = (Vec*)accumulator.black;
-        oppAccumulator = (Vec*)accumulator.white;
+        stmAccumulator = (Vec*)&accumulator.black;
+        oppAccumulator = (Vec*)&accumulator.white;
     }
 
     Vec *stmWeights = (Vec*) &(NET->outputWeights[0]);

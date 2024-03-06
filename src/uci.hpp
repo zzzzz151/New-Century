@@ -3,6 +3,7 @@
 // clang-format-off
 
 #include "perft.hpp"
+#include "bench.hpp"
 
 namespace uci { // Universal chess interface
 
@@ -23,8 +24,6 @@ inline void uciLoop(Searcher &searcher)
         if (received == "" || tokens.size() == 0)
             continue;
 
-        searcher.resetLimits();
-
         try {
 
         if (received == "quit" || !std::cin.good())
@@ -43,55 +42,68 @@ inline void uciLoop(Searcher &searcher)
             go(searcher, tokens);
         else if (tokens[0] == "print" || tokens[0] == "d"
         || tokens[0] == "display" || tokens[0] == "show")
-            searcher.root.board.print();
+            searcher.mBoard.print();
         else if (tokens[0] == "perft")
         {
             int depth = stoi(tokens[1]);
-            perft::perftBench(searcher.root.board, depth);
+            perftBench(searcher.mBoard, depth);
         }
         else if (tokens[0] == "perftsplit" 
         || tokens[0] == "splitperft" 
         || tokens[0] == "perftdivide")
         {
             int depth = stoi(tokens[1]);
-            perft::perftSplit(searcher.root.board, depth);
+            perftSplit(searcher.mBoard, depth);
+        }
+        else if (tokens[0] == "bench")
+        {
+            if (tokens.size() > 1)
+            {
+                int depth = stoi(tokens[1]);
+                bench(depth);
+            }
+            else
+                bench();
+        }
+        else if (received == "eval") {
+            std::cout << nnue::evaluate(searcher.mBoard.accumulator(), 
+                                        searcher.mBoard.sideToMove()) 
+                      << std::endl;
         }
         else if (tokens[0] == "makemove")
         {
-            if (tokens[1] == "0000" || tokens[1] == "null" || tokens[1] == "none")
-            {
-                assert(!searcher.root.board.inCheck());
-                searcher.root.board.makeMove(MOVE_NONE);
-            }
-            else
-            {
-                Move move = searcher.root.board.uciToMove(tokens[1]);
-                searcher.root.board.makeMove(move);
-            }
+            Move move = searcher.mBoard.uciToMove(tokens[1]);
+            searcher.mBoard.makeMove(move);
         }
-        else if (received == "eval") {
-            Color stm = searcher.root.board.sideToMove();
-            Accumulator &acc = searcher.root.board.accumulator;
-            std::cout << nnue::evaluate(acc, stm) << std::endl;
-        }
+        /*
         else if (received == "policy") {
-            Node root = Node(searcher.root.board, nullptr, 0);
+            Node root = Node(searcher.mBoard, nullptr, 0);
 
-            for (int i = 0; i < root.moves.size(); i++)
-                for (int j = i+1; j < root.moves.size(); j++)
-                    if (root.policy[j] > root.policy[i]) 
+            for (int i = 0; i < root.mMoves.size(); i++)
+                for (int j = i+1; j < root.mMoves.size(); j++)
+                    if (root.mPolicy[j] > root.mPolicy[i]) 
                     {
-                        std::swap(root.policy[i], root.policy[j]);
-                        root.moves.swap(i, j);
+                        std::swap(root.mPolicy[i], root.mPolicy[j]);
+                        std::swap(root.mMoves[i], root.mMoves[j]);
                     }
 
-            for (int i = 0; i < root.moves.size(); i++)
-                std::cout << root.moves[i].toUci() 
-                          << " " << roundToDecimalPlaces(root.policy[i] * 100.0, 2)
+            for (int i = 0; i < root.mMoves.size(); i++)
+                std::cout << root.mMoves[i].toUci() 
+                          << " " << roundToDecimalPlaces(root.mPolicy[i], 4)
                           << std::endl;
         }
-        else if (received == "tree")
-            searcher.root.printTree();
+        */
+        else if (received == "tree" && searcher.mNodes > 0)
+            searcher.mRoot.printTree();
+        else if (received == "tree 1" && searcher.mNodes > 0)
+        {
+            for (int i = 0; i < searcher.mRoot.mChildren.size(); i++)
+            {
+                Node *child = &searcher.mRoot.mChildren[i];
+                Move move = searcher.mRoot.mMoves[i];
+                std::cout << child->toString(move) << std::endl;
+            }
+        }
 
         } 
         catch (const char* errorMessage)
@@ -133,7 +145,7 @@ inline void position(Searcher &searcher, std::vector<std::string> &tokens)
 
     if (tokens[1] == "startpos")
     {
-        searcher.root.board = START_BOARD;
+        searcher.mBoard = START_BOARD;
         movesTokenIndex = 2;
     }
     else if (tokens[1] == "fen")
@@ -143,34 +155,35 @@ inline void position(Searcher &searcher, std::vector<std::string> &tokens)
         for (i = 2; i < tokens.size() && tokens[i] != "moves"; i++)
             fen += tokens[i] + " ";
         fen.pop_back(); // remove last whitespace
-        searcher.root.board = Board(fen);
+        searcher.mBoard = Board(fen);
         movesTokenIndex = i;
     }
 
     for (int i = movesTokenIndex + 1; i < tokens.size(); i++)
     {
-        Move move = searcher.root.board.uciToMove(tokens[i]);
-        searcher.root.board.makeMove(move);
+        Move move = searcher.mBoard.uciToMove(tokens[i]);
+        searcher.mBoard.makeMove(move);
     }
 }
 
 inline void go(Searcher &searcher, std::vector<std::string> &tokens)
 {
+    searcher.resetLimits();
     u64 milliseconds = U64_MAX;
     u64 incrementMilliseconds = 0;
-    u16 movesToGo = 25;
+    u16 movesToGo = 23;
     bool isMoveTime = false;
 
-    for (int i = 1; i < tokens.size() - 1; i += 2)
+    for (int i = 1; i < (int)tokens.size() - 1; i += 2)
     {
         i64 value = stoi(tokens[i + 1]);
 
-        if ((tokens[i] == "wtime" && searcher.root.board.sideToMove() == Color::WHITE) 
-        ||  (tokens[i] == "btime" && searcher.root.board.sideToMove() == Color::BLACK))
+        if ((tokens[i] == "wtime" && searcher.mBoard.sideToMove() == Color::WHITE) 
+        ||  (tokens[i] == "btime" && searcher.mBoard.sideToMove() == Color::BLACK))
             milliseconds = value;
 
-        else if ((tokens[i] == "winc" && searcher.root.board.sideToMove() == Color::WHITE) 
-        ||       (tokens[i] == "binc" && searcher.root.board.sideToMove() == Color::BLACK))
+        else if ((tokens[i] == "winc" && searcher.mBoard.sideToMove() == Color::WHITE) 
+        ||       (tokens[i] == "binc" && searcher.mBoard.sideToMove() == Color::BLACK))
             incrementMilliseconds = value;
 
         else if (tokens[i] == "movestogo")
@@ -181,11 +194,11 @@ inline void go(Searcher &searcher, std::vector<std::string> &tokens)
             isMoveTime = true;
         }
         else if (tokens[i] == "nodes")
-            searcher.maxNodes = value;
+            searcher.mMaxNodes = value;
     }
 
     searcher.setTimeLimits(milliseconds, incrementMilliseconds, movesToGo, isMoveTime);
-    Move bestMove = searcher.search();
+    Move bestMove = searcher.search(true);
     assert(bestMove != MOVE_NONE);
     std::cout << "bestmove " + bestMove.toUci() << std::endl;
 }

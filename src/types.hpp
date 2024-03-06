@@ -81,6 +81,14 @@ enum class File : u8
     H = 7
 };
 
+enum class GameState : i8
+{
+    WON = 1,
+    LOST = -1,
+    DRAW = 0,
+    ONGOING = 2
+};
+
 const u64 ONES = 0xFFFF'FFFF'FFFF'FFFF;
 
 const u8 CASTLE_SHORT = 0, CASTLE_LONG = 1;

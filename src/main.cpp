@@ -18,6 +18,8 @@ int main()
     #endif
 
     attacks::init();
+    initInBetweenLineThrough();
+    initZobrist();
     Searcher searcher = Searcher(START_BOARD);
     uci::uciLoop(searcher);
     return 0;

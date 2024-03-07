@@ -8,8 +8,7 @@
 src-test
 src-test/
 
-trainer
-trainer/
+trainer/build
 
 games.txt
 games.pgn

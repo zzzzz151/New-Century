@@ -3,11 +3,17 @@
 #pragma once
 
 #ifdef _MSC_VER
-#define NEW_CENTURY_MSVC
+#define NC_MSVC
 #pragma push_macro("_MSC_VER")
 #undef _MSC_VER
 #endif
+
 #include "incbin.h"
+
+#ifdef NC_MSVC
+#pragma pop_macro("_MSC_VER")
+#undef NC_MSVC
+#endif
 
 #include "simd.hpp"
 using namespace SIMD;
@@ -25,8 +31,8 @@ struct alignas(ALIGNMENT) Net {
     i16 outputBias;
 };
 
-INCBIN(NetFile, "src/value_net.nnue");
-const Net *NET = reinterpret_cast<const Net*>(gNetFileData);
+INCBIN(ValueNetFile, ValueNetFileName);
+const Net *NET = reinterpret_cast<const Net*>(gValueNetFileData);
 
 struct alignas(ALIGNMENT) Accumulator
 {

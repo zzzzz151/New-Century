@@ -4,6 +4,8 @@
 
 #include "perft.hpp"
 #include "bench.hpp"
+#include "trainer/convert.hpp"
+//#include "trainer.hpp"
 
 namespace uci { // Universal chess interface
 
@@ -104,6 +106,10 @@ inline void uciLoop(Searcher &searcher)
                 std::cout << child->toString(move) << std::endl;
             }
         }
+        else if (tokens[0] == "convert" && tokens.size() == 3)
+            convert(tokens[1], tokens[2]);
+        //else if (received == "train")
+        //    train();
 
         } 
         catch (const char* errorMessage)

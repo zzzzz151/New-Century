@@ -162,19 +162,6 @@ const static std::array<std::array<u64, 2>, 2> CASTLING_MASKS = {
     1ULL << 56  // Black long castle
 };
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wc99-designator"
-
-// [kingTargetSquare]
-std::pair<Square, Square> CASTLING_ROOK_FROM_TO[64] = {
-    [6] = {7, 5},    // White short castle
-    [2] = {0, 3},    // White long castle
-    [62] = {63, 61}, // Black short castle
-    [58] = {56, 59}  // Black long castle
-};
-
-#pragma clang diagnostic pop
-
 inline void trim(std::string &str) {
     size_t first = str.find_first_not_of(" \t\n\r");
     size_t last = str.find_last_not_of(" \t\n\r");
@@ -281,10 +268,16 @@ std::string getRandomString(int length) {
     return randomString;
 }
 
-u64 IN_BETWEEN[64][64], LINE_THROUGH[64][64]; // [square][square]
+std::pair<Square, Square> CASTLING_ROOK_FROM_TO[64];
+u64 IN_BETWEEN[64][64], LINE_THROUGH[64][64]; 
 
-constexpr void initInBetweenLineThrough()
+constexpr void initUtils()
 {
+    CASTLING_ROOK_FROM_TO[6] = {7,5}; // White short castle
+    CASTLING_ROOK_FROM_TO[2] = {0, 3}; // White long castle
+    CASTLING_ROOK_FROM_TO[62] = {63, 61}; // Black short castle
+    CASTLING_ROOK_FROM_TO[58] = {56, 59}; // Black long castle
+
     constexpr int DIRECTIONS[8][2] = {{0,1}, {1,0}, {-1,0}, {0, -1}, 
                                       {1,1}, {1, -1}, {-1, 1}, {-1,-1}};
 

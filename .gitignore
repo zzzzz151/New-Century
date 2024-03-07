@@ -8,7 +8,10 @@
 src-test
 src-test/
 
-trainer/build
+build
+**/16M.txt
+**/16M.bin
+**/1M.bin
 
 games.txt
 games.pgn

@@ -3,6 +3,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <array>
 #include <iostream>
 #include <algorithm>
 #include <bitset>
@@ -149,7 +150,7 @@ inline Color pieceColor(Piece piece)
 
 inline Piece makePiece(PieceType pieceType, Color color)
 {
-    assert(pieceType != PieceType::NONE);
+    assert(pieceType != PieceType::NONE && color != Color::NONE);
     int pt = (int)pieceType;
     return color == Color::WHITE ? (Piece)pt : (Piece)(pt+6);
 }
@@ -192,7 +193,6 @@ inline std::vector<std::string> splitString(std::string &str, char delimiter)
 
     return strSplit;
 }
-
 
 inline void printBitboard(u64 bb)
 {
@@ -242,34 +242,59 @@ inline u64 millisecondsElapsed(std::chrono::steady_clock::time_point start)
     return (std::chrono::steady_clock::now() - start) / std::chrono::milliseconds(1);
 }
 
-inline bool isNumber(std::string &s)
+std::array<std::pair<Square, Square>, 64> CASTLING_ROOK_FROM_TO;
+std::array<std::array<u64, 64> ,64> IN_BETWEEN, LINE_THROUGH;
+
+ void initInBetweenLineThrough(int sq1, int sq2)
 {
-    std::string::const_iterator it = s.begin();
-    while (it != s.end() && std::isdigit(*it)) ++it;
-    return !s.empty() && it == s.end();
-}
+    constexpr int DIRECTIONS[8][2] = {{0,1}, {1,0}, {-1,0}, {0, -1}, 
+                                      {1,1}, {1, -1}, {-1, 1}, {-1,-1}};
 
-std::string getRandomString(int length) {
-    const std::string characters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-    const int charactersLength = characters.length();
+    int rank = (int)squareRank(sq1);
+    int file = (int)squareFile(sq1);
+    bool found = false;
+    LINE_THROUGH[sq1][sq2] = (1ULL << sq1) | (1ULL << sq2);
+    
+    for (auto [x, y] : DIRECTIONS) {
+        u64 between = 0;
+        int r = rank, f = file;
 
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> distribution(0, charactersLength - 1);
+        while (true) {
+            r += x;
+            f += y;
 
-    std::string randomString;
-    randomString.reserve(length);
+            if (r < 0 || r > 7 || f < 0 || f > 7)
+                break;
 
-    for (int i = 0; i < length; ++i) {
-        int randomIndex = distribution(gen);
-        randomString.push_back(characters[randomIndex]);
+            Square newSq = r * 8 + f;
+            if (found) {
+                LINE_THROUGH[sq1][sq2] |= 1ULL << newSq;
+                continue;
+            }
+
+            if (newSq == sq2) {
+                found = true;
+                IN_BETWEEN[sq1][sq2] = between;
+                LINE_THROUGH[sq1][sq2] |= between;
+            }
+
+            between |= 1ULL << newSq;
+        }
+
+        if (!found) continue; 
+        
+        while (true) {
+            rank += x * -1;
+            file += y * -1;
+            if (rank < 0 || rank > 7 || file < 0 || file > 7)
+                break;
+            int sq = rank * 8 + file;
+            LINE_THROUGH[sq1][sq2] |= 1ULL << sq;
+        }
+
+        break;
     }
-
-    return randomString;
 }
-
-std::pair<Square, Square> CASTLING_ROOK_FROM_TO[64];
-u64 IN_BETWEEN[64][64], LINE_THROUGH[64][64]; 
 
 constexpr void initUtils()
 {
@@ -278,56 +303,9 @@ constexpr void initUtils()
     CASTLING_ROOK_FROM_TO[62] = {63, 61}; // Black short castle
     CASTLING_ROOK_FROM_TO[58] = {56, 59}; // Black long castle
 
-    constexpr int DIRECTIONS[8][2] = {{0,1}, {1,0}, {-1,0}, {0, -1}, 
-                                      {1,1}, {1, -1}, {-1, 1}, {-1,-1}};
-
     for (int sq1 = 0; sq1 < 64; sq1++)
         for (int sq2 = 0; sq2 < 64; sq2++)
-        {
-            int rank = (int)squareRank(sq1);
-            int file = (int)squareFile(sq1);
-            bool found = false;
-            LINE_THROUGH[sq1][sq2] = (1ULL << sq1) | (1ULL << sq2);
-            
-            for (auto [x, y] : DIRECTIONS) {
-                u64 between = 0;
-                int r = rank, f = file;
-
-                while (true) {
-                    r += x;
-                    f += y;
-
-                    if (r < 0 || r > 7 || f < 0 || f > 7)
-                        break;
-
-                    Square newSq = r * 8 + f;
-                    if (found) {
-                        LINE_THROUGH[sq1][sq2] |= 1ULL << newSq;
-                        continue;
-                    }
-
-                    if (newSq == sq2) {
-                        found = true;
-                        IN_BETWEEN[sq1][sq2] = between;
-                        LINE_THROUGH[sq1][sq2] |= between;
-                    }
-
-                    between |= 1ULL << newSq;
-                }
-
-                if (found) {
-                    while (true) {
-                        rank += x * -1;
-                        file += y * -1;
-                        if (rank < 0 || rank > 7 || file < 0 || file > 7)
-                            break;
-                        int sq = rank * 8 + file;
-                        LINE_THROUGH[sq1][sq2] |= 1ULL << sq;
-                    }
-                    break;
-                }
-            }
-        }
+            initInBetweenLineThrough(sq1, sq2);
 }
 
 class MyRng {

@@ -1,10 +1,7 @@
 #pragma once
 
 // clang-format off
-#include <array>
-#include <vector>
 #include <random>
-#include <cassert>
 #include <cstring> // for memset()
 #include "types.hpp"
 #include "utils.hpp"
@@ -12,9 +9,9 @@
 #include "attacks.hpp"
 #include "nnue.hpp"
 
-u64 ZOBRIST_COLOR[2],         // [color]
-    ZOBRIST_PIECES[2][6][64], // [color][pieceType][square]
-    ZOBRIST_FILES[8];         // [file]
+std::array<u64, 2> ZOBRIST_COLOR; // [color]
+std::array<std::array<std::array<u64, 64>, 6>, 2> ZOBRIST_PIECES; // [color][pieceType][square]
+std::array<u64, 8> ZOBRIST_FILES; // [file]
 
 inline void initZobrist()
 {
@@ -55,6 +52,7 @@ struct BoardState
 
     inline BoardState(std::string fen)
     {
+        mLastMove = MOVE_NONE;
         mAccumulator = Accumulator();
 
         trim(fen);
@@ -114,8 +112,6 @@ struct BoardState
         // Parse last 2 fen tokens
         mPliesSincePawnOrCapture = fenSplit.size() >= 5 ? stoi(fenSplit[4]) : 0;
         mMoveCounter = fenSplit.size() >= 6 ? stoi(fenSplit[5]) : 1;
-
-        mLastMove = MOVE_NONE;
     }
 
     inline Color sideToMove() { return mColorToMove; }
@@ -331,7 +327,7 @@ struct BoardState
     inline bool isSquareAttacked(Square square, Color colorAttacking)
     {
         if (getBitboard(colorAttacking, PieceType::PAWN)
-        & attacks::pawnAttacks(square, oppColor(colorAttacking)))
+        & attacks::pawnAttacks(oppColor(colorAttacking), square))
             return true;
 
         if (getBitboard(colorAttacking, PieceType::KNIGHT)
@@ -366,7 +362,7 @@ struct BoardState
     {
         u64 attackers = getBitboard(PieceType::KNIGHT) & attacks::knightAttacks(sq);
         attackers |= getBitboard(PieceType::KING) & attacks::kingAttacks(sq);
-        attackers |= getBitboard(PieceType::PAWN) & attacks::pawnAttacks(sq, oppColor(colorAttacking));
+        attackers |= getBitboard(PieceType::PAWN) & attacks::pawnAttacks(oppColor(colorAttacking), sq);
 
         u64 rooksQueens = getBitboard(PieceType::ROOK) ^ getBitboard(PieceType::QUEEN);
         attackers |= rooksQueens & attacks::rookAttacks(sq, occupancy());
@@ -437,7 +433,7 @@ struct BoardState
         u64 enemyPawns = getBitboard(oppColor, PieceType::PAWN);
         while (enemyPawns) {
             u8 sq = poplsb(enemyPawns);
-            threats |= attacks::pawnAttacks(sq, oppColor);
+            threats |= attacks::pawnAttacks(oppColor, sq);
         }
 
         u8 enemyKingSquare = lsb(getBitboard(oppColor, PieceType::KING));
@@ -496,7 +492,7 @@ struct BoardState
         // En passant
         if (mEnPassantSquare != SQUARE_NONE)
         {
-            u64 ourNearbyPawns = ourPawns & attacks::pawnAttacks(mEnPassantSquare, enemyColor);
+            u64 ourNearbyPawns = ourPawns & attacks::pawnAttacks(enemyColor, mEnPassantSquare);
             while (ourNearbyPawns) {
                 u8 ourPawnSquare = poplsb(ourNearbyPawns);
                 auto _zobristHash = mZobristHash;
@@ -557,7 +553,7 @@ struct BoardState
 
             // Generate this pawn's captures 
 
-            u64 pawnAttacks = attacks::pawnAttacks(sq, mColorToMove) & them() & movableBb;
+            u64 pawnAttacks = attacks::pawnAttacks(mColorToMove, sq) & them() & movableBb;
             if (sqBb & (pinnedDiagonal | pinnedNonDiagonal)) 
                 pawnAttacks &= LINE_THROUGH[kingSquare][sq];
 
@@ -778,7 +774,7 @@ class Board
 {
     private:
     std::vector<BoardState> mStates;
-    BoardState *mState;
+    BoardState *mState = nullptr;
 
     public:
 
@@ -864,6 +860,7 @@ class Board
     inline bool inCheck() { return mState->inCheck(); }
 
     inline void getMoves(std::vector<Move> &moves, bool underpromotions = true) {
+        assert(mStates.size() >= 1 && mState == &mStates.back());
         mState->getMoves(moves, underpromotions);
     }
 
@@ -872,8 +869,8 @@ class Board
     }
 
     inline void makeMove(Move move) {
+        assert(mStates.size() >= 1 && mState == &mStates.back());
         assert(move != MOVE_NONE);
-        assert(mState == &mStates.back());
 
         mStates.push_back(*mState);
         mState = &mStates.back();
@@ -881,22 +878,25 @@ class Board
     }
 
     inline void undoMove() {
-        assert(mStates.size() > 1);
-        mState = &mStates[mStates.size() - 2];
+        assert(mStates.size() >= 2 && mState == &mStates.back());
         mStates.pop_back();
+        mState = &mStates.back();
     }
 
-    inline auto numStates() { return mStates.size(); }
+    inline auto numStates() { 
+        assert(mStates.size() >= 1 && mState == &mStates.back());
+        return mStates.size(); 
+    }
 
     inline void revertToState(int stateIdx) {
-        assert(mState == &mStates.back());
+        assert(mStates.size() >= 1 && mState == &mStates.back());
         assert(stateIdx >= 0 && stateIdx < (int)mStates.size());
 
         mState = &mStates[stateIdx];
         mStates.resize(stateIdx + 1);
 
-        assert(mState == &mStates.back());
-        assert(mStates.size() >= 1 && stateIdx == (int)mStates.size() - 1);
+        assert(mStates.size() >= 1 && mState == &mStates.back());
+        assert(stateIdx == (int)mStates.size() - 1);
     }
 };
 

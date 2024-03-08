@@ -3,17 +3,11 @@
 #pragma once
 
 #ifdef _MSC_VER
-#define NC_MSVC
+#define NEW_CENTURY_MSVC
 #pragma push_macro("_MSC_VER")
 #undef _MSC_VER
 #endif
-
 #include "incbin.h"
-
-#ifdef NC_MSVC
-#pragma pop_macro("_MSC_VER")
-#undef NC_MSVC
-#endif
 
 #include "simd.hpp"
 using namespace SIMD;
@@ -25,21 +19,20 @@ const i32 SCALE = 400, QA = 181, QB = 64;
 constexpr int WEIGHTS_PER_VEC = sizeof(Vec) / sizeof(i16);
 
 struct alignas(ALIGNMENT) Net {
-    i16 featureWeights[768 * HIDDEN_LAYER_SIZE];
-    i16 featureBiases[HIDDEN_LAYER_SIZE];
-    i16 outputWeights[2][HIDDEN_LAYER_SIZE];
-    i16 outputBias;
+    std::array<i16, 768 * HIDDEN_LAYER_SIZE>          featureWeights;
+    std::array<i16, HIDDEN_LAYER_SIZE>                featureBiases;
+    std::array<std::array<i16, HIDDEN_LAYER_SIZE>, 2> outputWeights;
+    i16                                               outputBias;
 };
 
-INCBIN(ValueNetFile, ValueNetFileName);
-const Net *NET = reinterpret_cast<const Net*>(gValueNetFileData);
+INCBIN(NetFile, "src/value_net.nnue");
+const Net *NET = reinterpret_cast<const Net*>(gNetFileData);
 
 struct alignas(ALIGNMENT) Accumulator
 {
     std::array<i16, HIDDEN_LAYER_SIZE> white, black;
 
-    inline Accumulator()
-    {
+    inline Accumulator() {
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
             white[i] = black[i] = NET->featureBiases[i];
     }
@@ -65,16 +58,7 @@ struct alignas(ALIGNMENT) Accumulator
             black[i] -= NET->featureWeights[blackIdx * HIDDEN_LAYER_SIZE + i];
         }
     }
-};
-
-inline i32 crelu(i16 x) {
-    return x < 0 ? 0 : x > QA ? QA : x;
-}
-
-inline i32 screlu(i32 x) {
-    i32 clamped = std::clamp(x, 0, QA);
-    return clamped * clamped;
-}
+}; // struct alignas(ALIGNMENT) Accumulator
 
 inline i32 evaluate(Accumulator &accumulator, Color color)
 {
@@ -115,6 +99,6 @@ inline i32 evaluate(Accumulator &accumulator, Color color)
     return (vecHaddEpi32(sum) / QA + NET->outputBias) * SCALE / (QA * QB);
 }
 
-}
+} // namespace nnue
 
 using Accumulator = nnue::Accumulator;

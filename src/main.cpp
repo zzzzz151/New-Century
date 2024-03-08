@@ -15,11 +15,9 @@ int main() {
         std::cout << "Not using avx2 or avx512" << std::endl;
     #endif
 
-    assert(false);
-
-    attacks::init();
     initUtils();
     initZobrist();
+    attacks::init();
     Searcher searcher = Searcher(START_BOARD);
     uci::uciLoop(searcher);
     return 0;

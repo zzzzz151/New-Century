@@ -1,4 +1,3 @@
-#include <stdexcept>
 #include "tree_node.hpp"
 
 class Searcher {

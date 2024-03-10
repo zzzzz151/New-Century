@@ -366,3 +366,11 @@ inline std::string gameStateToString(GameState gameState)
            : gameState == GameState::DRAW ? "GameState::DRAW"
            : "GameState::ONGOING";
 }
+
+template<typename T>
+inline std::string vecToString(const std::vector<T> &vec) {
+    std::string str = "";
+    for (const auto &elem : vec) 
+        str += std::to_string(elem) + ", ";
+    return str + "\n";
+}

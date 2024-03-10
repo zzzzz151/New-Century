@@ -4,13 +4,13 @@
 .ipynb_checkpoints
 
 **/*.exe
+**/*.txt
+**/*.bin
+**/*.json
+**/*.pth
 
 src-test
 src-test/
-
-**/16M.txt
-**/16M.bin
-**/1M.bin
 
 games.txt
 games.pgn

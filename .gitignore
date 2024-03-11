@@ -2,15 +2,18 @@
 .vscode
 .ipynb_checkpoints/
 .ipynb_checkpoints
+src-test
+src-test/
+trainer/nets
+trainer/nets/
+trainer/__pycache__
+trainer/__pycache__/
 
 **/*.exe
 **/*.txt
 **/*.bin
 **/*.json
 **/*.pth
-
-src-test
-src-test/
 
 games.txt
 games.pgn

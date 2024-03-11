@@ -1,7 +1,41 @@
 #include <fstream>
 #include <bit>
 #include "board.hpp"
-#include "data_entry.hpp"
+
+#pragma pack(push, 1)
+struct DataEntry {
+    public:
+
+    Color stm = Color::NONE;
+    u8 numActiveInputs = 0;
+    std::vector<i16> activeInputs = { };
+    u8 numMoves = 0;
+    std::vector<i16> movesIdxs = { };
+    u16 bestMoveIdx = 4096;
+
+    inline DataEntry() = default;
+
+    inline std::string toString()
+    {
+        return "stm " + std::to_string((int)stm)
+               + " numActiveInputs " + std::to_string((int)numActiveInputs)
+               + "\nactiveInputs " + vecToString(activeInputs)
+               + "numMoves " +  std::to_string((int)numMoves)
+               + "\nmovesIdxs " + vecToString(movesIdxs)
+               + "bestMoveIdx " + std::to_string(bestMoveIdx);
+    }
+
+    inline auto size()
+    {
+        return sizeof(stm) 
+               + sizeof(numActiveInputs) 
+               + 2 * activeInputs.size() 
+               + sizeof(numMoves) 
+               + 2 * movesIdxs.size() 
+               + sizeof(bestMoveIdx);
+    }
+};
+#pragma pack(pop)
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
@@ -81,6 +115,7 @@ int main(int argc, char* argv[]) {
         }
 
         assert(entry.numActiveInputs == entry.activeInputs.size());
+        std::sort(entry.activeInputs.begin(), entry.activeInputs.end());
 
         entry.numMoves = moves.size();
         for (Move move : moves) {
@@ -93,6 +128,7 @@ int main(int argc, char* argv[]) {
             entry.movesIdxs.push_back((i16)from * 64 + (i16)to);
             assert(entry.movesIdxs.back() >= 0 && entry.movesIdxs.back() < 4096);
         }
+        std::sort(entry.movesIdxs.begin(), entry.movesIdxs.end());
 
         Square bestMoveFrom = bestMove.from();
         Square bestMoveTo = bestMove.to();

@@ -13,13 +13,12 @@ import copy
 INPUT_SIZE = 768
 HIDDEN_SIZE = 32
 OUTPUT_SIZE = 4096
-EPOCHS = 40
-BATCH_SIZE = 16384
+EPOCHS = 2
+BATCH_SIZE = 8192
 LR = 0.001
-LR_DROP_EPOCH = 100
-LR_DROP_MULTIPLIER = 0.1
+LR_DROP_MULTIPLIER = 0.2
 DATALOADER_WORKERS = 11
-DATA_FILE = "65M.bin"
+DATA_FILE = "200K.bin"
 NETS_FOLDER = "nets"
 
 if torch.cuda.is_available():
@@ -63,40 +62,41 @@ class DataEntry:
     bestMoveIdx: ctypes.c_int16() = ctypes.c_int16()
 
 class MyDataset(Dataset):
-    def __init__(self):
+    def __init__(self, fileName, batchSize):
+        self.fileName = fileName
+        self.batchSize = batchSize
         self.numEntries = 0
-        self.entries = [i for i in range(BATCH_SIZE)]
+        self.entries = [i for i in range(self.batchSize)]
         self.batchesPosInFile = [0]
 
-        file = open(DATA_FILE, "rb")
+        file = open(fileName, "rb")
         entry = None
         while (entry := self.readEntry(file)):
             self.numEntries += 1
-            if self.numEntries % BATCH_SIZE == 0:
+            if self.numEntries % self.batchSize == 0:
                 self.batchesPosInFile.append(file.tell())
-
         file.close()
-        assert self.numEntries >= BATCH_SIZE
-        self.numEntries -= self.numEntries % BATCH_SIZE
-        self.batchesPosInFile.pop()
 
+        assert self.numEntries >= self.batchSize
+        self.numEntries -= self.numEntries % self.batchSize
+        self.batchesPosInFile.pop()
         print("Total positions:", self.numEntries)
 
     def __len__(self):
         return self.numEntries
 
     def __getitem__(self, idx):
-        if idx % BATCH_SIZE == 0:
-            file = open(DATA_FILE, "rb")
-            file.seek(self.batchesPosInFile[int(idx / BATCH_SIZE)])
+        if idx % self.batchSize == 0:
+            file = open(self.fileName, "rb")
+            file.seek(self.batchesPosInFile[int(idx / self.batchSize)])
 
-            for i in range(BATCH_SIZE):
+            for i in range(self.batchSize):
                 self.entries[i] = self.readEntry(file)
                 assert self.entries[i]
 
             file.close()
 
-        entry = self.entries[idx % BATCH_SIZE]
+        entry = self.entries[idx % self.batchSize]
 
         inputs = torch.sparse_coo_tensor(
             torch.LongTensor(entry.activeInputs).unsqueeze(0), 
@@ -168,17 +168,18 @@ if __name__ == "__main__":
     print("Epochs:", EPOCHS)
     print("Batch size:", BATCH_SIZE)
     print("Learning rate:", LR)
-    print("LR drop epoch:", LR_DROP_EPOCH)
     print("LR drop multiplier:", LR_DROP_MULTIPLIER)
     print("Nets folder:", NETS_FOLDER)
     print("Dataloader workers:", DATALOADER_WORKERS)
     print("Data file:", DATA_FILE)
 
+    assert(EPOCHS % 2 == 0)
+
     net = Net()
     lossFunction = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(net.parameters(), lr=LR)
 
-    dataset = MyDataset()
+    dataset = MyDataset(DATA_FILE, BATCH_SIZE)
     dataLoader = torch.utils.data.DataLoader(
         dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=DATALOADER_WORKERS, collate_fn=collate)
     numBatches = len(dataLoader)
@@ -192,7 +193,7 @@ if __name__ == "__main__":
     for epoch in range(1, EPOCHS+1):
         totalEpochLoss = 0.0
 
-        if epoch-1 == LR_DROP_EPOCH:
+        if epoch-1 == EPOCHS / 2:
             for param_group in optimizer.param_groups:
                 param_group['lr'] = LR * LR_DROP_MULTIPLIER
             print("LR dropped to {:.8f}".format(LR * LR_DROP_MULTIPLIER))

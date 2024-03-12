@@ -2,11 +2,12 @@ from train import *
 import chess
 import numpy as np
 
-def printPolicy(net, fen):
-    print("Fen:", fen)
+def printPolicyFromFen(net: Net, fen: str):
+    print("Printing policy from fen", fen)
     fen_parts = fen.split(' ')
     fen_board = fen_parts[0]
-    inputs = torch.zeros(768)
+    isBlackStm = fen_parts[1] == "b"
+    activeInputs = []
 
     for rank_idx, rank in enumerate(fen_board.split('/')):
         file_idx = 0
@@ -14,30 +15,39 @@ def printPolicy(net, fen):
             if char.isdigit():
                 file_idx += int(char)
             else:
-                piece_type = char.lower()
-                piece_color = char.islower()  # True for black, False for white
-                piece_value = {'p': 0, 'n': 1, 'b': 2, 'r': 3, 'q': 4, 'k': 5}[piece_type]
                 sq = 8 * (7 - rank_idx) + file_idx
+                isBlackPiece = char.islower() 
+                pieceType = {'p': 0, 'n': 1, 'b': 2, 'r': 3, 'q': 4, 'k': 5}[char.lower()]
 
-                if piece_color:  # Black piece
-                    inputs[384 + 64 * piece_value + sq] = 1
-                else:  # White piece
-                    inputs[64 * piece_value + sq] = 1
+                if (isBlackPiece and isBlackStm) or (not isBlackPiece and not isBlackStm):
+                    activeInputs.append(64 * pieceType + sq)
+                else:
+                    activeInputs.append(384 + 64 * pieceType + sq ^ 56)
 
                 file_idx += 1
+
+    inputs = torch.sparse_coo_tensor(
+        torch.LongTensor(activeInputs).unsqueeze(0), 
+        torch.ones(len(activeInputs)),
+        (768,))
+
+    #print("Inputs:", inputs.coalesce().indices())
 
     @dataclass
     class MoveWithIdx:
         move: chess.Move
         moveIdx: int
 
-    board = chess.Board(fen)
-    movesWithIdx = [MoveWithIdx(move=legalMove, moveIdx=legalMove.from_square*64+legalMove.to_square) 
-        for legalMove in list(board.legal_moves)]
-
+    movesWithIdx = []
     illegals = torch.ones(OUTPUT_SIZE)
-    for moveWithIdx in movesWithIdx:
-        illegals[moveWithIdx.moveIdx] = 0
+
+    board = chess.Board(fen)
+    for legalMove in list(board.legal_moves):
+        sqFrom = legalMove.from_square
+        sqTo = legalMove.to_square
+        moveIdx = sqFrom*64+sqTo if not isBlackStm else (sqFrom^56)*64+(sqTo^56)
+        movesWithIdx.append(MoveWithIdx(move=legalMove, moveIdx=moveIdx))
+        illegals[moveIdx] = 0
 
     output = net(inputs, illegals)
     output = torch.nn.functional.softmax(output, dim=0)
@@ -47,13 +57,45 @@ def printPolicy(net, fen):
         print("{} ({}): {:.4f}".format(
             moveWithIdx.move.uci(), moveWithIdx.moveIdx, output[moveWithIdx.moveIdx]))
 
+def printPolicyFromDataEntry(net: Net, dataset: MyDataset, i: int):
+    print("Printing policy from DataEntry index", i)
+    inputs, illegals, target = dataset.__getitem__(i)
+    output = net(inputs, illegals)
+    output = torch.nn.functional.softmax(output, dim=0)
+
+    @dataclass
+    class PoliciedMove:
+        moveIdx: int
+        score: float
+
+    policiedMoves = []
+    for moveIdx in dataset.entries[i].movesIdxs:
+        policiedMoves.append(PoliciedMove(moveIdx=moveIdx, score=output[moveIdx]))
+
+    policiedMoves.sort(key = lambda policiedMove: policiedMove.score, reverse=True)
+    for policiedMove in policiedMoves:
+        print("{}: {:.4f}".format(policiedMove.moveIdx, policiedMove.score))
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Invalid num of args")
         exit(1)
 
+    dataset = MyDataset("3.bin", 3)
+
     net = Net()
     net.load_state_dict(torch.load(sys.argv[1]))
-    printPolicy(net, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+
+    # start pos
+    printPolicyFromFen(net, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+    printPolicyFromDataEntry(net, dataset, 0)
+    print() 
+
+    # kiwipete (best move e2a6)
+    printPolicyFromFen(net, "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
+    printPolicyFromDataEntry(net, dataset, 1)
     print()
-    printPolicy(net, "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
+
+    # after e2e4
+    printPolicyFromFen(net, "r1bqkbnr/pppppppp/2n5/1B6/4P3/8/PPPP1PPP/RNBQK1NR b KQkq - 2 2") 
+    printPolicyFromDataEntry(net, dataset, 2)

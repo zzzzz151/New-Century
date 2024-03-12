@@ -11,7 +11,9 @@ trainer/__pycache__/
 
 **/*.exe
 **/*.txt
+!trainer/printPolicy.txt
 **/*.bin
+!trainer/printPolicy.bin
 **/*.json
 **/*.pth
 

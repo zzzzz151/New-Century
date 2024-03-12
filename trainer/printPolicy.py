@@ -3,11 +3,11 @@ import chess
 import numpy as np
 
 def printPolicyFromFen(net: Net, fen: str):
-    print("Printing policy from fen", fen)
+    print("Policy from fen", fen)
     fen_parts = fen.split(' ')
     fen_board = fen_parts[0]
     isBlackStm = fen_parts[1] == "b"
-    activeInputs = []
+    inputs = torch.zeros(INPUT_SIZE)
 
     for rank_idx, rank in enumerate(fen_board.split('/')):
         file_idx = 0
@@ -20,18 +20,11 @@ def printPolicyFromFen(net: Net, fen: str):
                 pieceType = {'p': 0, 'n': 1, 'b': 2, 'r': 3, 'q': 4, 'k': 5}[char.lower()]
 
                 if (isBlackPiece and isBlackStm) or (not isBlackPiece and not isBlackStm):
-                    activeInputs.append(64 * pieceType + sq)
+                    inputs[64 * pieceType + sq] = 1
                 else:
-                    activeInputs.append(384 + 64 * pieceType + sq ^ 56)
+                    inputs[84 + 64 * pieceType + sq ^ 56] = 1
 
                 file_idx += 1
-
-    inputs = torch.sparse_coo_tensor(
-        torch.LongTensor(activeInputs).unsqueeze(0), 
-        torch.ones(len(activeInputs)),
-        (768,))
-
-    #print("Inputs:", inputs.coalesce().indices())
 
     @dataclass
     class MoveWithIdx:

@@ -93,6 +93,16 @@ struct Move
 
         return str;
     }
+
+    inline u16 idx(Color stm)
+    {
+        u16 from = move.from();
+        u16 to = move.to();
+
+        return stm == Color::WHITE
+               ? from * 64 + to
+               : (from ^ 56) * 64 + (to ^ 56);
+    }
     
 };
 

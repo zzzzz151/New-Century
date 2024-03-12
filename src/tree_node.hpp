@@ -8,7 +8,7 @@ struct Node {
     GameState mGameState;
     std::vector<Node> mChildren;
     std::vector<Move> mMoves;
-    //std::vector<float> mPolicy;
+    std::vector<float> mPolicy;
     u32 mVisits;
     double mResultsSum;
     u16 mDepth;
@@ -19,7 +19,7 @@ struct Node {
         mParent = parent;
         mChildren = {};
         board.getMoves(mMoves);
-        std::shuffle(mMoves.begin(), mMoves.end(), myRng);
+        
         //mPolicy.resize(mMoves.size());
         mVisits = mResultsSum = 0;
         mDepth = depth;
@@ -42,13 +42,6 @@ struct Node {
         return (double)mResultsSum / (double)mVisits;
     }
 
-    inline double uct() {
-        assert(mParent  != nullptr);
-        assert(mVisits > 0);
-        return Q() + UCT_C * sqrt(ln(mParent->mVisits) / mVisits);
-    }
-
-    /*
     inline double puct(int moveIdx) {
         assert(mMoves.size() == mPolicy.size());
         assert(mPolicy.size() > 0 && moveIdx < mPolicy.size());
@@ -61,7 +54,6 @@ struct Node {
         U /= 1.0 + (double)child->mVisits;
         return child->Q() + U;
     }
-    */
 
     inline Node* select(Board &board) 
     {

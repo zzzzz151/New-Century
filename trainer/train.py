@@ -9,16 +9,17 @@ from torch.utils.data import Dataset, DataLoader
 import json
 from json import JSONEncoder
 import copy
+import time
 
 INPUT_SIZE = 768
 HIDDEN_SIZE = 32
 OUTPUT_SIZE = 4096
-EPOCHS = 2
-BATCH_SIZE = 8192
+EPOCHS = 40
+BATCH_SIZE = 16384
 LR = 0.001
 LR_DROP_MULTIPLIER = 0.2
-DATALOADER_WORKERS = 11
-DATA_FILE = "200K.bin"
+DATALOADER_WORKERS = 10
+DATA_FILE = "1M.bin"
 NETS_FOLDER = "nets"
 
 if torch.cuda.is_available():
@@ -41,6 +42,21 @@ class Net(torch.nn.Module):
             self.conn2.bias.uniform_(-1, 1)
 
     def forward(self, x, illegals):
+        if isinstance(x, list):
+            # x is a list of lists of active input indexes
+            coords = []
+            values = []
+            for row, indices in enumerate(x):
+                coords.extend([[row, index] for index in indices])
+                values.extend([1] * len(indices))
+
+            x = torch.sparse_coo_tensor(
+                    torch.tensor(coords).t().to(dtype=torch.int), 
+                    torch.tensor(values).to(dtype=torch.float32),
+                    size=(len(x), INPUT_SIZE))
+
+        x._coalesced_(True)
+        x = x.to(device)
         x = self.conn1(x)
         x = torch.relu(x)
         x = self.conn2(x)
@@ -98,18 +114,12 @@ class MyDataset(Dataset):
 
         entry = self.entries[idx % self.batchSize]
 
-        inputs = torch.sparse_coo_tensor(
-            torch.LongTensor(entry.activeInputs).unsqueeze(0), 
-            torch.ones(len(entry.activeInputs)),
-            (INPUT_SIZE,))
-
-        target = torch.tensor([entry.bestMoveIdx])
-
         illegals = torch.ones(OUTPUT_SIZE)
         for moveIdx in entry.movesIdxs:
             illegals[moveIdx] = 0
 
-        return (inputs, illegals, target)
+        # (inputs, illegals, target)
+        return (entry.activeInputs, illegals, torch.tensor([entry.bestMoveIdx]))
 
     def readEntry(self, file):
         stm = file.read(1)
@@ -145,11 +155,11 @@ class MyDataset(Dataset):
             movesIdxs=movesIdxs, bestMoveIdx=bestMoveIdx)
 
 def collate(batch):
-    # batch has BATCH_SIZE tuples
-    # batch[0][0].size() = torch.Size([768])
-    # batch[0][1].size() = torch.Size([4096])
-    # batch[0][2].size() = torch.Size([1])
-    stacked_inputs = torch.stack([item[0] for item in batch], dim=0)
+    # batch has BATCH_SIZE tuples with 3 elements each
+    # batch[0][0] -> active inputs (e.g. 21) for this position
+    # batch[0][1] -> illegals for this position, size OUTPUT_SIZE
+    # batch[0][2] -> best move idx for this position (e.g. 3483)
+    stacked_inputs = [item[0] for item in batch]
     stacked_illegals = torch.stack([item[1] for item in batch], dim=0)
     stacked_targets = torch.cat([item[2] for item in batch], dim=0)
     return stacked_inputs, stacked_illegals, stacked_targets
@@ -161,7 +171,10 @@ class EncodeTensor(JSONEncoder,Dataset):
         return super(EncodeTensor, self).default(obj)
     
 if __name__ == "__main__":
-    print("Device:", device)
+    if device != torch.device("cpu"):
+        print("Device: {} {}".format(device, torch.cuda.get_device_name(0)))
+    else:
+        print("Device: cpu")
     print("Input size:", INPUT_SIZE)
     print("Hidden size:", HIDDEN_SIZE)
     print("Output size:", OUTPUT_SIZE)
@@ -176,12 +189,15 @@ if __name__ == "__main__":
     assert(EPOCHS % 2 == 0)
 
     net = Net()
+    net = net.to(device)
     lossFunction = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(net.parameters(), lr=LR)
-
     dataset = MyDataset(DATA_FILE, BATCH_SIZE)
+
     dataLoader = torch.utils.data.DataLoader(
-        dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=DATALOADER_WORKERS, collate_fn=collate)
+        dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=DATALOADER_WORKERS, 
+        collate_fn=collate, pin_memory = device != torch.device("cpu"))
+
     numBatches = len(dataLoader)
     assert numBatches == len(dataset.batchesPosInFile)
 
@@ -191,6 +207,7 @@ if __name__ == "__main__":
     print()
 
     for epoch in range(1, EPOCHS+1):
+        epochStartTime = time.time()
         totalEpochLoss = 0.0
 
         if epoch-1 == EPOCHS / 2:
@@ -199,14 +216,16 @@ if __name__ == "__main__":
             print("LR dropped to {:.8f}".format(LR * LR_DROP_MULTIPLIER))
 
         for batchIdx, (inputs, illegals, target) in enumerate(dataLoader):
-            assert inputs.dim() == 2
-            assert inputs.size(0) == BATCH_SIZE
-            assert inputs.size(1) == INPUT_SIZE
+            assert len(inputs) == BATCH_SIZE
+            assert len(inputs[0]) > 0
             assert illegals.dim() == 2
             assert illegals.size(0) == BATCH_SIZE
             assert illegals.size(1) == OUTPUT_SIZE
             assert target.dim() == 1
             assert target.size(0) == BATCH_SIZE
+
+            illegals = illegals.to(device)
+            target = target.to(device)
 
             optimizer.zero_grad()
             outputs = net(inputs, illegals)
@@ -215,11 +234,14 @@ if __name__ == "__main__":
             optimizer.step()
 
             totalEpochLoss += loss.item()
-            avgEpochLoss = float(totalEpochLoss) / float(batchIdx+1)
 
-            sys.stdout.write("\rEpoch {}/{}, batch {}/{}, epoch train loss {:.4f}".format(
-                epoch, EPOCHS, batchIdx+1, numBatches, avgEpochLoss))
-            sys.stdout.flush()  
+            if batchIdx == 0 or (batchIdx+1) % 8 == 0:
+                avgEpochLoss = float(totalEpochLoss) / float(batchIdx+1)
+                epochPosPerSec = BATCH_SIZE * (batchIdx+1) / (time.time() - epochStartTime) 
+
+                sys.stdout.write("\rEpoch {}/{}, batch {}/{}, epoch train loss {:.4f}, {} positions/s".format(
+                    epoch, EPOCHS, batchIdx+1, numBatches, avgEpochLoss, int(epochPosPerSec)))
+                sys.stdout.flush()  
 
         netPthFileName = NETS_FOLDER + "/netEpoch" + str(epoch) + ".pth"
         netJsonFileName = NETS_FOLDER + "/netEpoch" + str(epoch) + ".json"

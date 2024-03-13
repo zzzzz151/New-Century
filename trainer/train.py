@@ -13,11 +13,14 @@ import time
 INPUT_SIZE = 768
 HIDDEN_SIZE = 32
 OUTPUT_SIZE = 4096
+CHECKPOINT = "nets/netEpoch35.pth" # Set to None if not resuming training
+START_EPOCH = 36
 EPOCHS = 40
 BATCH_SIZE = 16384
 LR = 0.001
+LR_DROP_EPOCH = 35
 LR_DROP_MULTIPLIER = 0.2
-DATALOADER_WORKERS = 10
+DATALOADER_WORKERS = 11
 DATA_FILE = "65M.bin"
 NETS_FOLDER = "nets"
 
@@ -155,9 +158,11 @@ if __name__ == "__main__":
     else:
         print("Device: cpu")
     print("Net arch: {}->{}->{}".format(INPUT_SIZE, HIDDEN_SIZE, OUTPUT_SIZE))
+    print("Resuming from:", CHECKPOINT)
     print("Epochs:", EPOCHS)
     print("Batch size:", BATCH_SIZE)
     print("Learning rate:", LR)
+    print("LR drop epoch:", LR_DROP_EPOCH)
     print("LR drop multiplier:", LR_DROP_MULTIPLIER)
     print("Nets folder:", NETS_FOLDER)
     print("Dataloader workers:", DATALOADER_WORKERS)
@@ -166,6 +171,10 @@ if __name__ == "__main__":
     assert(EPOCHS % 2 == 0)
 
     net = Net().to(device)
+    if CHECKPOINT != None and CHECKPOINT is not None and CHECKPOINT != "":
+        assert os.path.exists(CHECKPOINT)
+        net.load_state_dict(torch.load(CHECKPOINT))
+
     lossFunction = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(net.parameters(), lr=LR)
     dataset = MyDataset(DATA_FILE, BATCH_SIZE)
@@ -185,27 +194,28 @@ if __name__ == "__main__":
 
     print()
 
-    for epoch in range(1, EPOCHS+1):
+    for epoch in range(START_EPOCH, EPOCHS+1):
         epochStartTime = time.time()
         totalEpochLoss = 0.0
 
-        if epoch-1 == EPOCHS / 2:
+        if epoch-1 == LR_DROP_EPOCH:
             for param_group in optimizer.param_groups:
                 param_group['lr'] = LR * LR_DROP_MULTIPLIER
             print("LR dropped to {:.8f}".format(LR * LR_DROP_MULTIPLIER))
 
         for batchIdx, (inputs, illegals, target) in enumerate(dataLoader):
             target = target.to(device)
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
             outputs = net(inputs, illegals)
             loss = lossFunction(outputs, target)
             loss.backward()
             optimizer.step()
             totalEpochLoss += loss.item()
 
-            if batchIdx == 0 or (batchIdx+1) % 8 == 0:
+            if batchIdx == 0 or batchIdx == numBatches-1 or (batchIdx+1) % 8 == 0:
                 avgEpochLoss = float(totalEpochLoss) / float(batchIdx+1)
                 epochPosPerSec = BATCH_SIZE * (batchIdx+1) / (time.time() - epochStartTime) 
+
                 sys.stdout.write("\rEpoch {}/{}, batch {}/{}, epoch train loss {:.4f}, {} positions/s".format(
                     epoch, EPOCHS, batchIdx+1, numBatches, avgEpochLoss, int(epochPosPerSec)))
                 sys.stdout.flush()  

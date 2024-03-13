@@ -2,22 +2,27 @@
 .vscode
 .ipynb_checkpoints/
 .ipynb_checkpoints
-
-**/*.exe
-
 src-test
 src-test/
+trainer/__pycache__
+trainer/__pycache__/
 
-trainer
-trainer/
+**/*.exe
+converter/convert
+NewCenturyMain
+src/NewCentury
+NewCentury
 
+converter/*.txt
+trainer/*.bin
+
+sprt.py
+*.epd
+*.pgn
 games.txt
 games.pgn
 debug.txt
 notes.txt
 stderr.txt
 
-sprt.py
-*.epd
-*.pgn
 

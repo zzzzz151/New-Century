@@ -1,4 +1,3 @@
-#include <stdexcept>
 #include "tree_node.hpp"
 
 class Searcher {
@@ -35,7 +34,6 @@ class Searcher {
     }
 
     inline Move search(bool boolPrintInfo, u64 maxAvgDepth = U64_MAX) {
-        myRng.reset();
         mRoot = Node(mBoard, nullptr, 0);
         mNodes = 1;
         int boardStateIdx = (int)mBoard.numStates() - 1;

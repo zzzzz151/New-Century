@@ -308,6 +308,49 @@ constexpr void initUtils()
             initInBetweenLineThrough(sq1, sq2);
 }
 
+class MyRng {
+    public:
+
+    u64 rngX = 123456789, rngY = 362436069, rngZ = 521288629;
+
+    static constexpr u64 min() { return 0; }
+
+    static constexpr u64 max() { return std::numeric_limits<u64>::max(); }
+    
+    inline void reset() {
+        rngX = 123456789;
+        rngY = 362436069;
+        rngZ = 521288629;
+    }
+
+    inline u64 operator()() {
+        rngX ^= rngX << 16;
+        rngX ^= rngX >> 5;
+        rngX ^= rngX << 1;
+
+        u64 t = rngX;
+        rngX = rngY;
+        rngY = rngZ;
+        rngZ = t ^ rngX ^ rngY;
+
+        return rngZ;
+    }
+};
+
+MyRng myRng = MyRng();
+
+inline void softmax(std::vector<float> &vec) {
+    float total = 0;
+
+    for (int i = 0; i < vec.size(); i++) {
+        vec[i] = exp(vec[i]);
+        total += vec[i];
+    }
+
+    for (int i = 0; i < vec.size(); i++)
+        vec[i] /= total;
+}
+
 inline std::string roundToDecimalPlaces(double number, int decimalPlaces) {
     double factor = std::pow(10, decimalPlaces);
     double roundedNumber = std::round(number * factor) / factor;
@@ -322,4 +365,12 @@ inline std::string gameStateToString(GameState gameState)
            : gameState == GameState::LOST ? "GameState::LOST"
            : gameState == GameState::DRAW ? "GameState::DRAW"
            : "GameState::ONGOING";
+}
+
+template<typename T>
+inline std::string vecToString(const std::vector<T> &vec) {
+    std::string str = "";
+    for (const auto &elem : vec) 
+        str += std::to_string(elem) + ", ";
+    return str + "\n";
 }

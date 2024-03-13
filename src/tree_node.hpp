@@ -19,8 +19,7 @@ struct Node {
         mParent = parent;
         mChildren = {};
         board.getMoves(mMoves);
-        
-        //mPolicy.resize(mMoves.size());
+        policy::setPolicy(this, board);
         mVisits = mResultsSum = 0;
         mDepth = depth;
 
@@ -142,7 +141,6 @@ struct Node {
                + ", children " + std::to_string(mChildren.size())
                + ", visits " + std::to_string(mVisits)
                + ", Q (avg result) " + roundToDecimalPlaces(Q(), 4)
-               + ", UCT " + roundToDecimalPlaces(uct(), 4)
                + ")";
     }
 
@@ -154,5 +152,36 @@ struct Node {
             
         for (int i = 0; i < mChildren.size(); i++)
             mChildren[i].printTree(mMoves[i]);
+    }
+
+    inline void sortMovesAndPolicy()
+    {
+        assert(mMoves.size() == mPolicy.size());
+
+        for (int i = 0; i < mMoves.size(); i++)
+            for (int j = i + 1; j < mMoves.size(); j++)
+                if (mPolicy[j] > mPolicy[i])
+                {
+                    std::swap(mPolicy[i], mPolicy[j]);
+                    std::swap(mMoves[i], mMoves[j]);
+                }
+    }
+
+    inline void printPolicy()
+    {
+        assert(mMoves.size() == mPolicy.size());
+
+        if (mMoves.size() == 0)
+        {
+            std::cout << "No moves" << std::endl;
+            return;
+        }
+
+        sortMovesAndPolicy();
+
+        for (int i = 0; i < mMoves.size(); i++)
+            std::cout << mMoves[i].toUci() << ": " 
+                      << roundToDecimalPlaces(mPolicy[i], 4) 
+                      << std::endl;
     }
 };

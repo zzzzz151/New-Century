@@ -25,31 +25,34 @@ struct alignas(64) Net {
 INCBIN(PolicyNetFile, "src/policy_net.nnue");
 const Net *NET = reinterpret_cast<const Net*>(gPolicyNetFileData);
 
-constexpr int FEATURES[2][2][6][64]; // [stm][pieceColor][pieceType][square]
+constexpr int INPUTS_IDXS[2][2][6][64]; // [stm][pieceColor][pieceType][square]
 
-constexpr void initFeatures() {
+constexpr void initInputsIdxs() {
     for (u16 pieceColor : {0, 1})
         for (u16 pieceType = 0; pieceType <= 5; pieceType++)
             for (u16 sq = 0; sq < 64; sq++) {
                 // White stm
-                FEATURES[0][pieceColor][pieceType][sq] 
+                INPUTS_IDXS[0][pieceColor][pieceType][sq] 
                     = pieceColor * 384 + pieceType * 64 + sq:
 
                 // Black stm
-                FEATURES[1][pieceColor][pieceType][sq] 
+                INPUTS_IDXS[1][pieceColor][pieceType][sq] 
                     = !pieceColor * 384 + pieceType * 64 + (sq ^ 56);
             }
 }
 
-inline void addWeights(Color stm, Color pieceColor, PieceType pt, u64 bb, 
+inline void addWeights(Board &board, Color pieceColor, PieceType pt,
                        std::array<i16, HIDDEN_SIZE> &hiddenLayer)
 {
+    int stm = (int)board.sideToMove();
+    u64 bb = board.getBitboard(pieceColor, pt);
+
     while (bb > 0) {
         int sq = poplsb(bb);
         for (int i = 0; i < HIDDEN_SIZE; i++)
         {
-            int featureIdx = FEATURES[(int)stm][(int)pieceColor][(int)pt][sq];
-            hiddenLayer[i] += NET->weights1[featureIdx];
+            int inputIdx = INPUTS_IDXS[stm][(int)pieceColor][(int)pt][sq];
+            hiddenLayer[i] += NET->weights1[inputIdx];
         }
     }
 }
@@ -60,6 +63,11 @@ inline void setPolicy(Node &node, Board &board)
 
     if (node.mMoves.size() == 0) return;
 
+    if (node.mMoves.size() == 1) {
+        node.mPolicy[0] = 1;
+        return;
+    }
+
     // Initialize hidden layer with biases
     std::array<i16, HIDDEN_SIZE> hiddenLayer;
     for (int i = 0; i < HIDDEN_SIZE; i++)
@@ -68,12 +76,8 @@ inline void setPolicy(Node &node, Board &board)
     // Add the weights of the board pieces to the hidden layer
     for (Color pieceColor : {Color::WHITE, Color::BLACK})
         for (int pt = (int)PieceType::PAWN; i <= (int)PieceType::KING; i++)
-        {
-            u64 bb = board.getBitboard(pieceColor, (PieceType)pt);
-            addWeights(board.sideToMove(), pieceColor, (PieceType)pt, bb, hiddenLayer);
-        }
+            addWeights(board, pieceColor, (PieceType)pt, hiddenLayer);
 
-    
     float total = 0.0;
     for (int i = 0; i < node.mMoves.size(); i++)
     {

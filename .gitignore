@@ -4,8 +4,6 @@
 .ipynb_checkpoints
 src-test
 src-test/
-trainer/nets
-trainer/nets/
 trainer/__pycache__
 trainer/__pycache__/
 

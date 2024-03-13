@@ -31,8 +31,6 @@ def printPolicyFromFen(net: Net, fen: str):
                 inputs[idx] = 1
                 file_idx += 1
 
-    #print(torch.nonzero(inputs == 1))
-
     @dataclass
     class MoveWithIdx:
         move: chess.Move

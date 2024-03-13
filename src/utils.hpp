@@ -339,18 +339,6 @@ class MyRng {
 
 MyRng myRng = MyRng();
 
-inline void softmax(std::vector<float> &vec) {
-    float total = 0;
-
-    for (int i = 0; i < vec.size(); i++) {
-        vec[i] = exp(vec[i]);
-        total += vec[i];
-    }
-
-    for (int i = 0; i < vec.size(); i++)
-        vec[i] /= total;
-}
-
 inline std::string roundToDecimalPlaces(double number, int decimalPlaces) {
     double factor = std::pow(10, decimalPlaces);
     double roundedNumber = std::round(number * factor) / factor;

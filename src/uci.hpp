@@ -75,24 +75,10 @@ inline void uciLoop(Searcher &searcher)
             Move move = searcher.mBoard.uciToMove(tokens[1]);
             searcher.mBoard.makeMove(move);
         }
-        /*
         else if (received == "policy") {
             Node root = Node(searcher.mBoard, nullptr, 0);
-
-            for (int i = 0; i < root.mMoves.size(); i++)
-                for (int j = i+1; j < root.mMoves.size(); j++)
-                    if (root.mPolicy[j] > root.mPolicy[i]) 
-                    {
-                        std::swap(root.mPolicy[i], root.mPolicy[j]);
-                        std::swap(root.mMoves[i], root.mMoves[j]);
-                    }
-
-            for (int i = 0; i < root.mMoves.size(); i++)
-                std::cout << root.mMoves[i].toUci() 
-                          << " " << roundToDecimalPlaces(root.mPolicy[i], 4)
-                          << std::endl;
+            root.printPolicy();
         }
-        */
         else if (received == "tree" && searcher.mNodes > 0)
             searcher.mRoot.printTree();
         else if (received == "tree 1" && searcher.mNodes > 0)

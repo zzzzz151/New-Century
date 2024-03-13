@@ -18,7 +18,7 @@ int main() {
     initUtils();
     initZobrist();
     attacks::init();
-    policy::initFeatures();
+    policy::initInputsIdxs();
     Searcher searcher = Searcher(START_BOARD);
     uci::uciLoop(searcher);
     return 0;

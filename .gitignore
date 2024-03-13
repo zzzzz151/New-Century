@@ -13,8 +13,6 @@ converter/convert
 !trainer/printPolicy.txt
 **/*.bin
 !trainer/printPolicy.bin
-**/*.json
-**/*.pth
 
 games.txt
 games.pgn

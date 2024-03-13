@@ -10,8 +10,8 @@ struct DataEntry {
     u8 numActiveInputs = 0;
     std::vector<i16> activeInputs = { };
     u8 numMoves = 0;
-    std::vector<i16> movesIdxs = { };
-    u16 bestMoveIdx = 4096;
+    std::vector<i16> moves4096 = { };
+    u16 bestMove4096 = 4096;
 
     inline DataEntry() = default;
 
@@ -21,8 +21,8 @@ struct DataEntry {
                + " numActiveInputs " + std::to_string((int)numActiveInputs)
                + "\nactiveInputs " + vecToString(activeInputs)
                + "numMoves " +  std::to_string((int)numMoves)
-               + "\nmovesIdxs " + vecToString(movesIdxs)
-               + "bestMoveIdx " + std::to_string(bestMoveIdx);
+               + "\nmoves4096 " + vecToString(moves4096)
+               + "bestmove4096 " + std::to_string(bestMove4096);
     }
 
     inline auto size()
@@ -31,8 +31,8 @@ struct DataEntry {
                + sizeof(numActiveInputs) 
                + 2 * activeInputs.size() 
                + sizeof(numMoves) 
-               + 2 * movesIdxs.size() 
-               + sizeof(bestMoveIdx);
+               + 2 * moves4096.size() 
+               + sizeof(bestMove4096);
     }
 };
 #pragma pack(pop)
@@ -119,33 +119,21 @@ int main(int argc, char* argv[]) {
 
         entry.numMoves = moves.size();
         for (Move move : moves) {
-            Square from = move.from();
-            Square to = move.to();
-            if (board.sideToMove() == Color::BLACK) {
-                from ^= 56;
-                to ^= 56;
-            }
-            entry.movesIdxs.push_back((i16)from * 64 + (i16)to);
-            assert(entry.movesIdxs.back() >= 0 && entry.movesIdxs.back() < 4096);
+            auto move4096 = move.to4096(board.sideToMove());
+            entry.moves4096.push_back((i16)move4096);
+            assert(entry.moves4096.back() >= 0 && entry.moves4096.back() < 4096);
         }
-        std::sort(entry.movesIdxs.begin(), entry.movesIdxs.end());
+        std::sort(entry.moves4096.begin(), entry.moves4096.end());
 
-        Square bestMoveFrom = bestMove.from();
-        Square bestMoveTo = bestMove.to();
-        if (board.sideToMove() == Color::BLACK) {
-            bestMoveFrom ^= 56;
-            bestMoveTo ^= 56;
-        }
-
-        entry.bestMoveIdx = (u16)bestMoveFrom * 64 + (u16)bestMoveTo;
-        assert(entry.bestMoveIdx < 4096);
+        entry.bestMove4096 = bestMove.to4096(board.sideToMove());
+        assert(entry.bestMove4096 < 4096);
 
         outFile.write(reinterpret_cast<const char*>(&entry.stm), sizeof(entry.stm));
         outFile.write(reinterpret_cast<const char*>(&entry.numActiveInputs), sizeof(entry.numActiveInputs));
         outFile.write(reinterpret_cast<const char*>(entry.activeInputs.data()), 2 * entry.activeInputs.size());
         outFile.write(reinterpret_cast<const char*>(&entry.numMoves), sizeof(entry.numMoves));
-        outFile.write(reinterpret_cast<const char*>(entry.movesIdxs.data()), 2 * entry.movesIdxs.size());
-        outFile.write(reinterpret_cast<const char*>(&entry.bestMoveIdx), sizeof(entry.bestMoveIdx));
+        outFile.write(reinterpret_cast<const char*>(entry.moves4096.data()), 2 * entry.moves4096.size());
+        outFile.write(reinterpret_cast<const char*>(&entry.bestMove4096), sizeof(entry.bestMove4096));
         positionsConverted++;
     }
 

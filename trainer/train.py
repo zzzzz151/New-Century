@@ -21,7 +21,7 @@ LR = 0.001
 LR_DROP_EPOCH = 20
 LR_DROP_MULTIPLIER = 0.2
 DATALOADER_WORKERS = 11
-DATA_FILE = "65M.bin"
+DATA_FILE = "1M.bin"
 NETS_FOLDER = "nets"
 
 if torch.cuda.is_available():
@@ -64,8 +64,8 @@ class Net(torch.nn.Module):
 class DataEntry:
     stm: ctypes.c_int8() = ctypes.c_int8()
     activeInputs: list[ctypes.c_int16()] = field(default_factory=list)
-    movesIdxs: list[ctypes.c_int16()] = field(default_factory=list)
-    bestMoveIdx: ctypes.c_int16() = ctypes.c_int16()
+    moves4096: list[ctypes.c_int16()] = field(default_factory=list)
+    bestMove4096: ctypes.c_int16() = ctypes.c_int16()
 
 class MyDataset(Dataset):
     def __init__(self, fileName, batchSize):
@@ -108,10 +108,10 @@ class MyDataset(Dataset):
             inputs[activeInput] = 1
 
         illegals = torch.ones(OUTPUT_SIZE)
-        for moveIdx in entry.movesIdxs:
-            illegals[moveIdx] = 0
+        for move4096 in entry.moves4096:
+            illegals[move4096] = 0
 
-        return (inputs, illegals, torch.tensor(entry.bestMoveIdx))
+        return (inputs, illegals, torch.tensor(entry.bestMove4096))
 
     def readEntry(self, file):
         stm = file.read(1)
@@ -135,16 +135,16 @@ class MyDataset(Dataset):
         numMoves = struct.unpack('<B', numMoves)[0] # Read as u8
         assert numMoves > 0 and numMoves <= 218
 
-        movesIdxs = file.read(numMoves * 2)
-        movesIdxs = struct.unpack("<{}h".format(numMoves), movesIdxs) # read as i16 list
-        assert(len(movesIdxs) == numMoves)
+        moves4096 = file.read(numMoves * 2)
+        moves4096 = struct.unpack("<{}h".format(numMoves), moves4096) # read as i16 list
+        assert(len(moves4096) == numMoves)
 
-        bestMoveIdx = file.read(2)
-        bestMoveIdx = struct.unpack('<H', bestMoveIdx)[0] # read as u16
-        assert bestMoveIdx < 4096
+        bestMove4096 = file.read(2)
+        bestMove4096 = struct.unpack('<H', bestMove4096)[0] # read as u16
+        assert bestMove4096 < 4096
 
         return DataEntry(stm=stm, activeInputs=activeInputs, 
-            movesIdxs=movesIdxs, bestMoveIdx=bestMoveIdx)
+            moves4096=moves4096, bestMove4096=bestMove4096)
 
 class EncodeTensor(JSONEncoder,Dataset):
     def default(self, obj):

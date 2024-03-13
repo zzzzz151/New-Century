@@ -71,7 +71,7 @@ class Searcher {
         std::cout << "info depth " << avgDepth
                   << " nodes " << mNodes
                   << " time " << msElapsed
-                  << " nps " << mNodes * 1000 / max(msElapsed, 1ULL)
+                  << " nps " << mNodes * 1000 / max(msElapsed, (u64)1)
                   << " wdl " << roundToDecimalPlaces(bestRootChild->Q(), 2)
                   << " pv " << bestRootMove.toUci()
                   << std::endl;

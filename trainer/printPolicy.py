@@ -31,29 +31,24 @@ def printPolicyFromFen(net: Net, fen: str):
                 inputs[idx] = 1
                 file_idx += 1
 
-    @dataclass
-    class MoveWithIdx:
-        move: chess.Move
-        moveIdx: int
+    def moveTo4096(mov):
+        if isBlackStm:
+            return (mov.from_square ^ 56) * 64 + (mov.to_square ^ 56)
+        return mov.from_square * 64 + mov.to_square
 
-    movesWithIdx = []
+    moves = list(chess.Board(fen).legal_moves)
     illegals = torch.ones(OUTPUT_SIZE)
 
-    board = chess.Board(fen)
-    for legalMove in list(board.legal_moves):
-        sqFrom = legalMove.from_square
-        sqTo = legalMove.to_square
-        moveIdx = sqFrom*64+sqTo if not isBlackStm else (sqFrom^56)*64+(sqTo^56)
-        movesWithIdx.append(MoveWithIdx(move=legalMove, moveIdx=moveIdx))
-        illegals[moveIdx] = 0
+    for move in moves:
+        illegals[moveTo4096(move)] = 0
 
     output = net(inputs, illegals)
     output = torch.nn.functional.softmax(output, dim=0)
 
-    movesWithIdx.sort(key=lambda moveWithIdx: output[moveWithIdx.moveIdx], reverse=True)
-    for moveWithIdx in movesWithIdx:
+    moves.sort(key=lambda move: output[moveTo4096(move)], reverse=True)
+    for move in moves:
         print("{} ({}): {:.4f}".format(
-            moveWithIdx.move.uci(), moveWithIdx.moveIdx, output[moveWithIdx.moveIdx]))
+            move.uci(), moveTo4096(move), output[moveTo4096(move)]))
 
 def printPolicyFromDataEntry(net: Net, dataset: MyDataset, i: int):
     print("DataEntry index", i)
@@ -64,16 +59,16 @@ def printPolicyFromDataEntry(net: Net, dataset: MyDataset, i: int):
 
     @dataclass
     class PoliciedMove:
-        moveIdx: int
+        move4096: int
         score: float
 
     policiedMoves = []
-    for moveIdx in dataset.entries[i].movesIdxs:
-        policiedMoves.append(PoliciedMove(moveIdx=moveIdx, score=output[moveIdx]))
+    for move4096 in dataset.entries[i].moves4096:
+        policiedMoves.append(PoliciedMove(move4096=move4096, score=output[move4096]))
 
     policiedMoves.sort(key = lambda policiedMove: policiedMove.score, reverse=True)
     for policiedMove in policiedMoves:
-        print("{}: {:.4f}".format(policiedMove.moveIdx, policiedMove.score))
+        print("{}: {:.4f}".format(policiedMove.move4096, policiedMove.score))
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:

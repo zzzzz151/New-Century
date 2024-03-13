@@ -87,7 +87,7 @@ inline void uciLoop(Searcher &searcher)
             {
                 Node *child = &searcher.mRoot.mChildren[i];
                 Move move = searcher.mRoot.mMoves[i];
-                std::cout << child->toString(move) << std::endl;
+                std::cout << child->toString(i) << std::endl;
             }
         }
 

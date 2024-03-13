@@ -9,18 +9,17 @@ trainer/__pycache__/
 
 **/*.exe
 converter/convert
-**/*.txt
-!trainer/printPolicy.txt
-**/*.bin
-!trainer/printPolicy.bin
 
+converter/*.txt
+trainer/*.bin
+
+sprt.py
+*.epd
+*.pgn
 games.txt
 games.pgn
 debug.txt
 notes.txt
 stderr.txt
 
-sprt.py
-*.epd
-*.pgn
 

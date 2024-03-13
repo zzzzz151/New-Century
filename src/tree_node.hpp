@@ -1,6 +1,7 @@
 #include "nnue.hpp"
+#include "policy.hpp"
 
-const double UCT_C = 1.75; // Higher => more exploration
+const double PUCT_C = 1.75; // Higher => more exploration
 
 struct Node {
     public:
@@ -19,7 +20,7 @@ struct Node {
         mParent = parent;
         mChildren = {};
         board.getMoves(mMoves);
-        policy::setPolicy(this, board);
+        policy::getPolicy(mPolicy, mMoves, board);
         mVisits = mResultsSum = 0;
         mDepth = depth;
 
@@ -49,7 +50,7 @@ struct Node {
         Node *child = &mChildren[moveIdx];
         assert(child->mVisits > 0);
 
-        double U = CPuct * mPolicy[moveIdx] * (double)mVisits;
+        double U = PUCT_C * mPolicy[moveIdx] * (double)mVisits;
         U /= 1.0 + (double)child->mVisits;
         return child->Q() + U;
     }
@@ -62,13 +63,13 @@ struct Node {
             return this;
 
         assert(mMoves.size() > 0);
-        double bestUct = -INF;
+        double bestPuct = -INF;
         int bestChildIdx = 0;
 
         for (int i = 0; i < mChildren.size(); i++) {
-            double childUct = mChildren[i].uct();
-            if (childUct > bestUct) {
-                bestUct = childUct;
+            double childPuct = puct(i);
+            if (childPuct > bestPuct) {
+                bestPuct = childPuct;
                 bestChildIdx = i;
             }
         }
@@ -81,10 +82,19 @@ struct Node {
         assert(mMoves.size() > 0);
         assert(mChildren.size() < mMoves.size());
 
+        // Incremental sort to get the next best move according to policy
+        for (int i = mChildren.size(); i < mMoves.size(); i++)
+            for (int j = i + 1; j < mMoves.size(); j++)
+                if (mPolicy[j] > mPolicy[i])
+                {
+                    std::swap(mPolicy[i], mPolicy[j]);
+                    std::swap(mMoves[i], mMoves[j]);
+                }
+
         Move move = mMoves[mChildren.size()];
         board.makeMove(move);
-        mChildren.push_back(Node(board, this, mDepth + 1));
 
+        mChildren.push_back(Node(board, this, mDepth + 1));
         return &mChildren.back();
     }
 
@@ -130,9 +140,13 @@ struct Node {
         return { &mChildren[mostVisitsIdx], mMoves[mostVisitsIdx] };
     }
 
-    inline std::string toString(Move move) 
+    inline std::string toString(int moveIdx = 0) 
     {
         assert(mVisits > 0);
+        assert(moveIdx == 0 ? mParent == nullptr : mParent != nullptr);
+
+        Move move = mParent != nullptr ? mParent->mMoves[moveIdx] : MOVE_NONE;
+        double myPuct = mParent != nullptr ? mParent->puct(moveIdx) : 0;
 
         return "(Node, move " + move.toUci()
                + ", depth " + std::to_string(mDepth)
@@ -141,30 +155,20 @@ struct Node {
                + ", children " + std::to_string(mChildren.size())
                + ", visits " + std::to_string(mVisits)
                + ", Q (avg result) " + roundToDecimalPlaces(Q(), 4)
+               + ", PUCT " + roundToDecimalPlaces(myPuct, 4)
                + ")";
     }
 
-    inline void printTree(Move move = MOVE_NONE) {
+    inline void printTree(int moveIdx = 0) {
+        assert(moveIdx == 0 ? mParent == nullptr : mParent != nullptr);
+
         for (int i = 0; i < mDepth; i++)
             std::cout << "  ";
 
-        std::cout << toString(move) << std::endl;
+        std::cout << toString(moveIdx) << std::endl;
             
         for (int i = 0; i < mChildren.size(); i++)
-            mChildren[i].printTree(mMoves[i]);
-    }
-
-    inline void sortMovesAndPolicy()
-    {
-        assert(mMoves.size() == mPolicy.size());
-
-        for (int i = 0; i < mMoves.size(); i++)
-            for (int j = i + 1; j < mMoves.size(); j++)
-                if (mPolicy[j] > mPolicy[i])
-                {
-                    std::swap(mPolicy[i], mPolicy[j]);
-                    std::swap(mMoves[i], mMoves[j]);
-                }
+            mChildren[i].printTree(i);
     }
 
     inline void printPolicy()
@@ -177,7 +181,14 @@ struct Node {
             return;
         }
 
-        sortMovesAndPolicy();
+        // sort moves and policy
+        for (int i = 0; i < mMoves.size(); i++)
+            for (int j = i + 1; j < mMoves.size(); j++)
+                if (mPolicy[j] > mPolicy[i])
+                {
+                    std::swap(mPolicy[i], mPolicy[j]);
+                    std::swap(mMoves[i], mMoves[j]);
+                }
 
         for (int i = 0; i < mMoves.size(); i++)
             std::cout << mMoves[i].toUci() << ": " 

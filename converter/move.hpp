@@ -93,6 +93,16 @@ struct Move
 
         return str;
     }
+
+    inline u16 to4096(Color stm)
+    {
+        u16 from = this->from();
+        u16 to = this->to();
+
+        return stm == Color::WHITE
+               ? from * 64 + to
+               : (from ^ 56) * 64 + (to ^ 56);
+    }
     
 };
 

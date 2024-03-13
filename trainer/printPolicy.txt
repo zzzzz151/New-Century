@@ -1,3 +1,0 @@
-rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 | e2e4
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 | e2a6
-8/4r3/3k4/8/3K4/r1Q5/8/8 b - - 0 1 | a3c3

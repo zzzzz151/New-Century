@@ -145,10 +145,10 @@ struct Node {
         return { &mChildren[mostVisitsIdx], mMoves[mostVisitsIdx] };
     }
 
-    inline std::string toString(int moveIdx = 0) 
+    inline std::string toString(int moveIdx = -1) 
     {
         assert(mVisits > 0);
-        assert(moveIdx == 0 ? mParent == nullptr : mParent != nullptr);
+        assert(moveIdx == -1 ? mParent == nullptr : mParent != nullptr);
 
         Move move = mParent != nullptr ? mParent->mMoves[moveIdx] : MOVE_NONE;
         double myPuct = mParent != nullptr ? mParent->puct(moveIdx) : 0;
@@ -164,8 +164,8 @@ struct Node {
                + ")";
     }
 
-    inline void printTree(int moveIdx = 0) {
-        assert(moveIdx == 0 ? mParent == nullptr : mParent != nullptr);
+    inline void printTree(int moveIdx = -1) {
+        assert(moveIdx == -1 ? mParent == nullptr : mParent != nullptr);
 
         for (int i = 0; i < mDepth; i++)
             std::cout << "  ";
@@ -176,15 +176,16 @@ struct Node {
             mChildren[i].printTree(i);
     }
 
-    inline void printPolicy()
+    inline void printPolicy(Board &board)
     {
-        assert(mMoves.size() == mPolicy.size());
-
         if (mMoves.size() == 0)
         {
             std::cout << "No moves" << std::endl;
             return;
         }
+
+        if (mPolicy.size() == 0)
+            policy::getPolicy(mPolicy, mMoves, board);
 
         // sort moves and policy
         for (int i = 0; i < mMoves.size(); i++)

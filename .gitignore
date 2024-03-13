@@ -9,6 +9,7 @@ trainer/__pycache__/
 
 **/*.exe
 converter/convert
+NewCenturyMain
 
 converter/*.txt
 trainer/*.bin

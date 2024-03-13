@@ -77,7 +77,7 @@ inline void uciLoop(Searcher &searcher)
         }
         else if (received == "policy") {
             Node root = Node(searcher.mBoard, nullptr, 0);
-            root.printPolicy();
+            root.printPolicy(searcher.mBoard);
         }
         else if (received == "tree" && searcher.mNodes > 0)
             searcher.mRoot.printTree();

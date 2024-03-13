@@ -13,12 +13,12 @@ import time
 INPUT_SIZE = 768
 HIDDEN_SIZE = 32
 OUTPUT_SIZE = 4096
-CHECKPOINT = "nets/netEpoch35.pth" # Set to None if not resuming training
-START_EPOCH = 36
+CHECKPOINT = None # Set to "nets/netEpoch15.pth" if resuming training, else None
+START_EPOCH = 1 # Set to 1 if not resuming training
 EPOCHS = 40
 BATCH_SIZE = 16384
 LR = 0.001
-LR_DROP_EPOCH = 35
+LR_DROP_EPOCH = 20
 LR_DROP_MULTIPLIER = 0.2
 DATALOADER_WORKERS = 11
 DATA_FILE = "65M.bin"
@@ -167,8 +167,6 @@ if __name__ == "__main__":
     print("Nets folder:", NETS_FOLDER)
     print("Dataloader workers:", DATALOADER_WORKERS)
     print("Data file:", DATA_FILE)
-
-    assert(EPOCHS % 2 == 0)
 
     net = Net().to(device)
     if CHECKPOINT != None and CHECKPOINT is not None and CHECKPOINT != "":

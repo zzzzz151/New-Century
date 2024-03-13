@@ -10,6 +10,7 @@ trainer/__pycache__
 trainer/__pycache__/
 
 **/*.exe
+converter/convert
 **/*.txt
 !trainer/printPolicy.txt
 **/*.bin

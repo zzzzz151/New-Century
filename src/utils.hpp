@@ -339,6 +339,7 @@ constexpr void initInBetweenLineThrough()
 
 class MyRng {
     public:
+    using result_type = u64;
 
     u64 rngX = 123456789, rngY = 362436069, rngZ = 521288629;
 

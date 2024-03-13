@@ -20,7 +20,7 @@ struct Node {
         mParent = parent;
         mChildren = {};
         board.getMoves(mMoves);
-        policy::getPolicy(mPolicy, mMoves, board);
+        mPolicy = {};
         mVisits = mResultsSum = 0;
         mDepth = depth;
 
@@ -63,6 +63,8 @@ struct Node {
             return this;
 
         assert(mMoves.size() > 0);
+        assert(mPolicy.size() == mMoves.size());
+
         double bestPuct = -INF;
         int bestChildIdx = 0;
 
@@ -81,6 +83,9 @@ struct Node {
     inline Node* expand(Board &board) {
         assert(mMoves.size() > 0);
         assert(mChildren.size() < mMoves.size());
+
+        if (mPolicy.size() == 0)
+            policy::getPolicy(mPolicy, mMoves, board);
 
         // Incremental sort to get the next best move according to policy
         for (int i = mChildren.size(); i < mMoves.size(); i++)
@@ -188,6 +193,8 @@ struct Node {
                 {
                     std::swap(mPolicy[i], mPolicy[j]);
                     std::swap(mMoves[i], mMoves[j]);
+                    if (i < mChildren.size() && j < mChildren.size())
+                        std::swap(mChildren[i], mChildren[j]);
                 }
 
         for (int i = 0; i < mMoves.size(); i++)

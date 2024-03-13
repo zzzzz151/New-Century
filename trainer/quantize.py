@@ -19,9 +19,9 @@ if __name__ == "__main__":
     net.load_state_dict(torch.load(sys.argv[1]))
 
     for param_name, param in net.named_parameters():
+        param.data = param.data.float()
         #param.data *= 255.0
         #param.data = param.data.round()
-        pass
 
     if not os.path.exists(OUTPUT_FOLDER):
         os.makedirs(OUTPUT_FOLDER)

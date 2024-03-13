@@ -44,7 +44,7 @@ constexpr void initInputsIdxs() {
 
                 // Black stm
                 INPUTS_IDXS[1][pieceColor][pt][sq] 
-                    = !pieceColor * 384 + pt * 64 + (sq ^ 56);
+                    = (!pieceColor) * 384 + pt * 64 + (sq ^ 56);
             }
 }
 
@@ -85,18 +85,22 @@ inline void getPolicy(std::vector<float> &policy, std::vector<Move> &moves, Boar
         for (int pt = (int)PieceType::PAWN; pt <= (int)PieceType::KING; pt++)
             addWeights(hiddenLayer, board, pieceColor, (PieceType)pt);
 
+    // ReLU the hidden layer
+    for (int i = 0; i < HIDDEN_SIZE; i++)
+        hiddenLayer[i] = max((float)0, hiddenLayer[i]);
+
     float total = 0.0;
     for (int i = 0; i < moves.size(); i++)
     {
         // Calculate the output neuron corresponding to this move
         auto move4096 = moves[i].to4096(board.sideToMove());
         policy[i] = NET->outputBiases[move4096];
-        for (int i = 0; i < HIDDEN_SIZE; i++)
-            policy[i] += hiddenLayer[i] * NET->weights2[i][move4096];
+        for (int j = 0; j < HIDDEN_SIZE; j++)
+            policy[i] += hiddenLayer[j] * NET->weights2[j][move4096];
 
         // Softmax part 1
+        policy[i] = exp(policy[i]); // e^policy[i]
         total += policy[i];
-        policy[i] = exp(policy[i]);
     }
 
     // Softmax part 2

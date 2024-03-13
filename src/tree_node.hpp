@@ -50,7 +50,7 @@ struct Node {
         Node *child = &mChildren[moveIdx];
         assert(child->mVisits > 0);
 
-        double U = PUCT_C * mPolicy[moveIdx] * (double)mVisits;
+        double U = PUCT_C * mPolicy[moveIdx] * sqrt((double)mVisits);
         U /= 1.0 + (double)child->mVisits;
         return child->Q() + U;
     }

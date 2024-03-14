@@ -12,7 +12,7 @@
 #include "simd.hpp"
 using namespace SIMD;
 
-namespace nnue {
+namespace value_nnue {
 
 const u16 HIDDEN_LAYER_SIZE = 128;
 const i32 SCALE = 400, QA = 181, QB = 64;
@@ -99,6 +99,4 @@ inline i32 evaluate(Accumulator &accumulator, Color color)
     return (vecHaddEpi32(sum) / QA + NET->outputBias) * SCALE / (QA * QB);
 }
 
-} // namespace nnue
-
-using Accumulator = nnue::Accumulator;
+} // namespace value_nnue

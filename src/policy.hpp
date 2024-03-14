@@ -22,14 +22,14 @@ struct alignas(64) Net {
     // [hiddenNeuronIdx]
     std::array<float, HIDDEN_SIZE> hiddenBiases;
 
-    // [hiddenNeuronIdx][outputNeuronIdx]
-    std::array<std::array<float, OUTPUT_SIZE>, HIDDEN_SIZE> weights2;
+    // [outputNeuronIdx][hiddenNeuronIdx]
+    std::array<std::array<float, HIDDEN_SIZE>, OUTPUT_SIZE> weights2;
 
     // [outputNeuronIdx]
     std::array<float, OUTPUT_SIZE> outputBiases; 
 };
 
-INCBIN(PolicyNetFile, "src/policy_net.bin");
+INCBIN(PolicyNetFile, "src-test/policy_net.bin");
 const Net *NET = reinterpret_cast<const Net*>(gPolicyNetFileData);
 
 int INPUTS_IDXS[2][2][6][64]; // [stm][pieceColor][pieceType][square]
@@ -56,11 +56,9 @@ inline void addWeights(std::array<float, HIDDEN_SIZE> &hiddenLayer,
 
     while (bb > 0) {
         int sq = poplsb(bb);
+        int inputIdx = INPUTS_IDXS[stm][(int)pieceColor][(int)pt][sq];
         for (int i = 0; i < HIDDEN_SIZE; i++)
-        {
-            int inputIdx = INPUTS_IDXS[stm][(int)pieceColor][(int)pt][sq];
             hiddenLayer[i] += NET->weights1[inputIdx][i];
-        }
     }
 }
 
@@ -96,7 +94,7 @@ inline void getPolicy(std::vector<float> &policy, std::vector<Move> &moves, Boar
         auto move4096 = moves[i].to4096(board.sideToMove());
         policy[i] = NET->outputBiases[move4096];
         for (int j = 0; j < HIDDEN_SIZE; j++)
-            policy[i] += hiddenLayer[j] * NET->weights2[j][move4096];
+            policy[i] += hiddenLayer[j] * NET->weights2[move4096][j];
 
         // Softmax part 1
         policy[i] = exp(policy[i]); // e^policy[i]

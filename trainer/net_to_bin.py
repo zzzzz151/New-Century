@@ -1,7 +1,7 @@
 from train import *
 import numpy as np
 
-OUTPUT_FOLDER = "quantized"
+OUTPUT_FOLDER = "nets-bin"
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
@@ -47,9 +47,9 @@ if __name__ == "__main__":
             bias.tofile(binFile)
 
         # Write weights2
-        for i in range(HIDDEN_SIZE):
-            for j in range(OUTPUT_SIZE):
-                weight = np.float32(net.conn2.weight[j, i].item())
+        for i in range(OUTPUT_SIZE):
+            for j in range(HIDDEN_SIZE):
+                weight = np.float32(net.conn2.weight[i, j].item())
                 weight.tofile(binFile)
         
         # Write output biases

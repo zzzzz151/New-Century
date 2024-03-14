@@ -1,7 +1,7 @@
-#include "nnue.hpp"
+#include "value_nnue.hpp"
 #include "policy.hpp"
 
-const double PUCT_C = 1.75; // Higher => more exploration
+const double PUCT_C = 2; // Higher => more exploration
 
 struct Node {
     public:
@@ -107,7 +107,7 @@ struct Node {
         if (mGameState != GameState::ONGOING)
             return (double)mGameState;
 
-        double eval = nnue::evaluate(board.accumulator(), board.sideToMove());
+        double eval = value_nnue::evaluate(board.accumulator(), board.sideToMove());
         double wdl = 1.0 / (1.0 + exp(-eval / 200.0)); // [0, 1]
         wdl *= 2; // [0, 2]
         wdl -= 1; // [-1, 1]

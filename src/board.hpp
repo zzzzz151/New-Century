@@ -7,7 +7,7 @@
 #include "utils.hpp"
 #include "move.hpp"
 #include "attacks.hpp"
-#include "nnue.hpp"
+#include "value_nnue.hpp"
 
 std::array<u64, 2> ZOBRIST_COLOR; // [color]
 std::array<std::array<std::array<u64, 64>, 6>, 2> ZOBRIST_PIECES; // [color][pieceType][square]
@@ -44,7 +44,7 @@ struct BoardState
     u16 mMoveCounter;
     u64 mZobristHash;
     Move mLastMove;
-    Accumulator mAccumulator;
+    value_nnue::Accumulator mAccumulator;
 
     public:
 
@@ -53,7 +53,7 @@ struct BoardState
     inline BoardState(std::string fen)
     {
         mLastMove = MOVE_NONE;
-        mAccumulator = Accumulator();
+        mAccumulator = value_nnue::Accumulator();
 
         trim(fen);
         std::vector<std::string> fenSplit = splitString(fen, ' ');
@@ -186,7 +186,7 @@ struct BoardState
 
     inline Move lastMove() { return mLastMove; }
 
-    inline Accumulator &accumulator() { return mAccumulator; }
+    inline value_nnue::Accumulator &accumulator() { return mAccumulator; }
 
     private:
 
@@ -826,7 +826,7 @@ class Board
 
     inline u64 zobristHash() { return mState->zobristHash(); }
 
-    inline Accumulator &accumulator() { return mState->accumulator(); }
+    inline value_nnue::Accumulator &accumulator() { return mState->accumulator(); }
 
     inline Move lastMove() { return mState->lastMove(); }
 

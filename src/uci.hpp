@@ -66,8 +66,8 @@ inline void uciLoop(Searcher &searcher)
                 bench();
         }
         else if (received == "eval") {
-            std::cout << nnue::evaluate(searcher.mBoard.accumulator(), 
-                                        searcher.mBoard.sideToMove()) 
+            std::cout << value_nnue::evaluate(searcher.mBoard.accumulator(), 
+                                              searcher.mBoard.sideToMove()) 
                       << std::endl;
         }
         else if (tokens[0] == "makemove")

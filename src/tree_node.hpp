@@ -46,10 +46,11 @@ struct Node {
         assert(mMoves.size() == mPolicy.size());
         assert(mPolicy.size() > 0 && moveIdx < mPolicy.size());
         assert(mChildren.size() > 0 && moveIdx < mChildren.size());
-        
+        assert(mVisits > 0);
+
         Node *child = &mChildren[moveIdx];
         assert(child->mVisits > 0);
-
+        
         double U = PUCT_C * mPolicy[moveIdx] * sqrt((double)mVisits);
         U /= 1.0 + (double)child->mVisits;
         return child->Q() + U;
@@ -83,6 +84,7 @@ struct Node {
     inline Node* expand(Board &board) {
         assert(mMoves.size() > 0);
         assert(mChildren.size() < mMoves.size());
+        assert(mGameState == GameState::ONGOING);
 
         if (mPolicy.size() == 0)
             policy::getPolicy(mPolicy, mMoves, board);
